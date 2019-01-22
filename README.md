@@ -5,13 +5,12 @@ Le but de ce PLDAC est de travailler sur la reconstruction de structure 3D à pa
 L'idée est de partir des travaux de Thibault Groueix http://imagine.enpc.fr/~groueixt/.
 
 1) Prise en main des architectures images et des données
-
 2) Construction d'un modèle prédictif
-
 3) Affinage du modèle et mise en valeur des résultats (un peu de codage OpenGL)
 
 
-On se sert d'un réseau de neurone entraîné sur http://www.image-net.org/
+On se sert d'un réseau de neurone entraîné sur http://www.image-net.org/.
+
 On pourra voir les autres méthodes sans les implémenter.
 1) Bibliographie
 2) Prise en main de la chaîne de traitement
@@ -23,5 +22,6 @@ On pourra voir les autres méthodes sans les implémenter.
 - 23/01 
 
 
-Encadrants : Vincent Guigue & Nicolas Baskiotis
+Encadrants : Vincent Guigue & Nicolas Baskiotis.
+
 Projet effectué à l'UPMC dans le master DAC pour le M1S2 de l'année 2018/2019
