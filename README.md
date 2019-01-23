@@ -30,6 +30,9 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
 - 29/01
 
 
-
+ 
+ 
+ 
 Projet effectué à l'UPMC dans le master DAC pour le M1S2 de l'année 2018/2019.
+
 Encadrants : Vincent Guigue & Nicolas Baskiotis.
