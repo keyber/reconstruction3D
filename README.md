@@ -12,7 +12,7 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
 ## TODO
 1) Comprendre l'article, bibliographie
 2) Prise en main de la chaîne de traitement
-    - Téléchargement des données, si possible celles utilisées par l'auteur
+    - Téléchargement des données depuis le cloud de l'ENCP.
 3) Développement selon nos envies (lecture de tutoriels PyTorch peut-être nécessaire)
 4) On pourra voir les autres méthodes sans les implémenter.
 
