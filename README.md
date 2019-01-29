@@ -12,8 +12,12 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
 ## TODO
 1) Comprendre l'article, bibliographie
 2) Prise en main de la chaîne de traitement
-    - Téléchargement des données depuis le cloud de l'ENCP.
-3) Développement selon nos envies (lecture de tutoriels PyTorch peut-être nécessaire)
+    - Téléchargement des mêmes données que l'auteur utilise depuis le cloud de l'ENCP.
+    - Installation des librairies nécessaires
+    - Chargement d'un modèle (vgg/ResNet) sur PyTorch (lecture de tutoriels PyTorch)
+    - Exécuter l'algorithme forward du modèle (image -> vecteur latent) sur un sous-ensemble d'image et vérifier son bon fonctionnement en affichant le [t-SNE](https://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html) des vecteurs latents.
+    - Afficher aussi des nuages de points
+3) Développement selon nos envies
 4) On pourra voir les autres méthodes sans les implémenter.
 
 
@@ -23,16 +27,19 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
 - 23/01
   - On a choisi le **framework** de deep learning **PyTorch** plutôt que TensorFlow ou Keras.
   - Les CNN (Convolutional Neural Network) sont des réseaux de neurones spécialement conçus pour travailler sur des images.
- [ImageNet](http://www.image-net.org/) est une base de données d'images contenant plus de 10^4 catégories et 10^2 images par catégories.
+ [ImageNet](http://www.image-net.org/) est une base de données d'images contenant plus de $10^4$ catégories et $10^2$ images par catégories.
  Parmi les différents **CNN** existants, on a choisi **VGG** (développé par Visual Geometry Group) pour ses performances et sa simplicité.
   - Via PyTorch, on a accès à différentes versions de réseaux VGG préentrainés sur ImageNet. On se servira par exemple de *VGG16* (réseau de neurones à 16 couches, sans "batch normalisation") https://pytorch.org/docs/master/torchvision/models.html#torchvision.models.vgg16.
 
 - 29/01
+  - Alternativement à VGG, on pourra se servir de ResNet (CNN avec une architecture complexe mais utilisé par Groueix)
+  - Précision de tâches du cahier des charges
+
+- 08/02
 
 
  
- 
+
  
 Projet effectué à l'UPMC dans le master DAC pour le M1S2 de l'année 2018/2019.
-
 Encadrants : Vincent Guigue & Nicolas Baskiotis.
