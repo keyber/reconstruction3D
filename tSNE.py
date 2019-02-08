@@ -4,7 +4,7 @@ from sklearn import manifold
 from sklearn import decomposition
 import matplotlib.pyplot as plt
 import os
-import demo2
+import loadImage
 
 
 def tSNE(vectors, nCat):
@@ -47,7 +47,7 @@ def genAll(root, id_category, nPerCat, nPerObj):
             with open(sub_path + "renderings.txt") as f:
                 cpt = 0
                 for line in f:
-                    res.append(demo2.loadImage(sub_path + line[:-1]))
+                    res.append(loadImage.loadImage(sub_path + line[:-1]))
                     cpt += 1
                     if cpt == nPerObj:
                         break
