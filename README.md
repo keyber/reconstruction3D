@@ -16,9 +16,12 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
     - Installation des librairies nécessaires
     - Chargement d'un modèle (vgg/ResNet) sur PyTorch (lecture de tutoriels PyTorch)
     - Exécuter l'algorithme forward du modèle (image -> vecteur latent) sur un sous-ensemble d'image et vérifier son bon fonctionnement en affichant le [t-SNE](https://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html) des vecteurs latents.
-    - Afficher aussi des nuages de points
-3) Développement selon nos envies
-4) On pourra voir les autres méthodes sans les implémenter.
+    - Afficher des nuages de points (matplotlib et/ou logiciel annexe)
+    - Afficher des nuages de points avec OpenGL
+3) Entraîner un réseau de neurones simple classifiant les objets à partir de leur représentation latente. Le réseau de neurones est composé d'une seule couche, cette couche est linéaire
+
+4) Développement selon nos envies
+5) On pourra voir les autres méthodes sans les implémenter.
 
 
 ## Carnet de bord
@@ -33,10 +36,14 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
 
 - 29/01
   - Alternativement à VGG, on pourra se servir de ResNet (CNN avec une architecture complexe mais utilisé par Groueix)
-  - Précision de tâches du cahier des charges
+  - Précision de tâches du cahier des charges (t-SNE)
 
 - 08/02
+  - visualisation t-SNE validée
+  - Précision de tâches du cahier des charges (entraînement, openGL)
 
+
+- 13/02
 
  
 
