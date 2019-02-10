@@ -13,9 +13,13 @@ def tSNE(vectors, nCat):
     #from mpl_toolkits.mplot3d import Axes3D
     #ax = plt.axes()#projection='3d')
     print("tSNE  input dimension", len(vectors[0]))
+    
     n_components = min(len(vectors), 50)
+    
     pca = decomposition.PCA(n_components=n_components)
-    principalComponent = pca.fit_transform(vectors)
+    
+    principalComponent = pca.fit_transform([v.numpy() for v in vectors])
+    
     print("après PCA", type(principalComponent), principalComponent.shape)
     
     colors = [(r/255, g/255, b/255) for r, g, b in
@@ -95,14 +99,15 @@ def get_latent(chosenSubSet, nPerCat, nPerObj):
             id_category.append(line.split()[1])
     
     #récupère les catégories des indices demandés
-    id_category = [id_category[i] for i in chosenSubSet]
+    if chosenSubSet:
+        id_category = [id_category[i] for i in chosenSubSet]
     
     local_path = "./data/latentVectors"
     try:
         #chargement des vecteurs latents
         latentVectors = _load_latent(local_path, id_category, nPerCat, nPerObj)
     except FileNotFoundError as e:
-        print("vecteurs latents non trouvés sur e disque", e)
+        print("vecteurs latents non trouvés sur le disque:\n",e)
         print("sauvegarde à l'emplacement", local_path)
         
         #chargement des images
@@ -147,29 +152,12 @@ def genModel():
 
 
 def main():
-    vgg = genModel()
+    n = 4
+    nPerClass = 10
+    nPerObj = 1
+    latentCat = get_latent(range(n), nPerClass, nPerObj)
     
-    root = "../AtlasNet/data/ShapeNet/"
-    id_category = []
-    with open(root + "synsetoffset2category.txt") as f:
-        for line in f:
-            id_category.append(line.split()[1])
-    
-    nCat = len(id_category)
-    nPerCat = 10
-    nPerObj = 4
-    
-    imagesCat = _genAll(root, id_category, nPerCat, nPerObj)
-    print("images:", (nCat, nPerCat, nPerObj), "=", len(imagesCat), type(imagesCat[0]))
-    
-    print("exécution forward")
-    tmp = vgg(imagesCat[0]).data.numpy()[0]
-    print("vecteur latent:", type(tmp), tmp.shape)
-    
-    latentCat = [vgg(i).data.numpy()[0].reshape((-1,)) for i in imagesCat]
-    #latentCat = [vgg(i).data.numpy()[0][0].reshape((-1,)) for i in imagesCat]
-    
-    tSNE(latentCat, nCat)
+    tSNE(latentCat, n)
     
     plt.show()
 
