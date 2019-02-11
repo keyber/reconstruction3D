@@ -77,9 +77,9 @@ class simpleClassifier(torch.nn.Module):
         return res
 
 
-def main():
-    #chosenSubSet = [0, 2] #points rouge et noir qui sont bien DISTINCTS sur la visualisation tSNE
-    chosenSubSet = [2, 7] #verts et gris qui sont CONFONDUS sur notre INSTANCE du tSNE
+def _main():
+    chosenSubSet = [0, 2] #points rouge et noir qui sont bien DISTINCTS sur la visualisation tSNE
+    #chosenSubSet = [2, 7] #verts et gris qui sont CONFONDUS sur notre INSTANCE du tSNE
     nCat = len(chosenSubSet)
     nPerCat = 100
     nPerObj = 1
@@ -116,4 +116,4 @@ def main():
     
 
 if __name__ == '__main__':
-    main()
+    _main()

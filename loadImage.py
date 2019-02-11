@@ -56,7 +56,7 @@ def top(arr, n=5):
     return heapq.nlargest(n, range(len(arr)), lambda x: arr[x])
 
 
-def main():
+def _main():
     import sys
     img = sys.argv[1] if len(sys.argv) >= 2 else "../AtlasNet/data/plane_input_demo.png"
     print("fichier: " + img)
@@ -86,4 +86,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    _main()

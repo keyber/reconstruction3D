@@ -72,7 +72,7 @@ def _save_latent(latent, root, id_category, nPerCat, nPerObj):
             if not os.path.isdir(path2):
                 os.mkdir(path2)
             for ind_view in range(nPerObj):
-                path3 = path2 + "/" + str(ind_obj)
+                path3 = path2 + "/" + str(ind_view)
                 if not os.path.isfile(path3):
                     np.save(path3, latent[cpt])
                 cpt+=1
@@ -85,7 +85,7 @@ def _load_latent(root, id_category, nPerCat, nPerObj):
         for ind_obj in range(nPerCat):
             path2 = path + "/" + str(ind_obj)
             for ind_view in range(nPerObj):
-                path3 = path2 + "/" + str(ind_obj) + ".npy"
+                path3 = path2 + "/" + str(ind_view) + ".npy"
                 latent.append(torch.tensor(np.load(path3)))
     return latent
 
@@ -137,25 +137,42 @@ def get_latent(chosenSubSet, nPerCat, nPerObj):
 
 def genModel():
     """
-    -2 donne un vecteur latent de dimensions (3, 224, 224) = 150 528
-    -1 donne un vecteur latent de dimensions (512, 7, 7)   =  25 088
-    """
+    Une image est de taille (224,224,3) = 150528,
+    le modèle la résume en un vecteur de dimensions (512, 7, 7) = 25 088"""
     vgg = models.vgg16(pretrained=True)
-    
-    #vgg.classifier = nn.Sequential(*list(vgg.classifier.children())[:-1])
-    
-    vgg = nn.Sequential(*list(vgg.children())[:-1])
-    
+    vgg = vgg.features
+    vgg.eval()
     for param in vgg.parameters():
         param.requires_grad = False
     return vgg
 
 
-def main():
-    n = 4
-    nPerClass = 10
+def _test():
+    vgg = models.vgg16(pretrained=True)
+    #récupère une image
+    im = _genAll("../AtlasNet/data/ShapeNetRendering/", ["02691156"], 1, 1)[0]
+    l = list(vgg.features.children()) + list(vgg.classifier.children())
+    
+    print("taille des couches")
+    try:
+        for i in range(1, len(l)):
+            net = nn.Sequential(*l[:i])
+            first = net(im).data.numpy()[0]
+            print(i, first.shape)
+    except RuntimeError as e:
+        print(e)
+    
+    print("\n\n\n")
+
+
+def _main():
+    #_test()
+
+    chosenSubSet = [0, 2, 7]
+    n = len(chosenSubSet)
+    nPerClass = 100
     nPerObj = 1
-    latentCat = get_latent(range(n), nPerClass, nPerObj)
+    latentCat = get_latent(chosenSubSet, nPerClass, nPerObj)
     
     tSNE(latentCat, n)
     
@@ -163,4 +180,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    _main()
