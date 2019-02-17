@@ -44,8 +44,10 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
 
 
 - 13/02
+  - Les résultats obtenus par notre réseau de neurone entrainé (dont nous sommes incertains) sont cohérents.
+  - Précision de tâches du cahier des charges (implémentation des fonctions de coût, génération 3D, openGL)
 
- 
+- 19/02
 
  
 Projet effectué à l'UPMC dans le master DAC pour le M1S2 de l'année 2018/2019.
