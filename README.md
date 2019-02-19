@@ -32,7 +32,7 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
 - 23/01
   - On a choisi le **framework** de deep learning **PyTorch** plutôt que TensorFlow ou Keras.
   - Les CNN (Convolutional Neural Network) sont des réseaux de neurones spécialement conçus pour travailler sur des images.
- [ImageNet](http://www.image-net.org/) est une base de données d'images contenant plus de <sup>4<i>10</i> catégories et <sup>2<i>10</i> images par catégories.
+ [ImageNet](http://www.image-net.org/) est une base de données d'images contenant plus de 4<sup10</sup> catégories et 2<sup>10</sup> images par catégories.
  Parmi les différents **CNN** existants, on a choisi **VGG** (développé par Visual Geometry Group) pour ses performances et sa simplicité.
   - Via PyTorch, on a accès à différentes versions de réseaux VGG préentrainés sur ImageNet. On se servira par exemple de *VGG16* (réseau de neurones à 16 couches, sans "batch normalisation") https://pytorch.org/docs/master/torchvision/models.html#torchvision.models.vgg16.
 
