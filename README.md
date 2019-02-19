@@ -20,14 +20,14 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
     - Afficher des nuages de points avec OpenGL
 3) Entraîner un réseau de neurones simple classifiant les objets à partir de leur représentation latente. Le réseau de neurones est composé d'une seule couche, cette couche est linéaire.
 4)
-   a) Définir un auto encoder nuage de points 3D :
+   1) Définir un auto encoder nuage de points 3D :
       - entrée "3N" : un ensemble de n points dans \[-1; 1]<sup>3</sup>
       - encodeur : 3N -> FC 512 -> ReLU -> FC 128 -> ReLU -> FC 2
       - (on récupère un vecteur latent de taille 2)
       - décodeur  : 2 -> FC 128 -> ReLU -> FC 512 -> ReLU -> FC 3N -> tanh
       - sortie de même dimension que l'entrée
-   b) Définir la fonction de coût "distance de Chamfer" en ne se servant que d'un MLP
-   c) Générer des nuages de points pour entraîner le réseau
+   2) Définir la fonction de coût "distance de Chamfer" en ne se servant que d'un seul MLP
+   3) Générer des nuages de points pour entraîner le réseau
 5) Développement selon nos envies
 6) On pourra voir les autres méthodes sans les implémenter.
 
