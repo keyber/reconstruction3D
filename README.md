@@ -19,9 +19,15 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
     - Afficher des nuages de points (matplotlib et/ou logiciel annexe)
     - Afficher des nuages de points avec OpenGL
 3) Entraîner un réseau de neurones simple classifiant les objets à partir de leur représentation latente. Le réseau de neurones est composé d'une seule couche, cette couche est linéaire.
-4) Deuxième réseau de neurones à entraîner :
-    - Auto encoder nuage de points 3D
-    - entrée 
+4)
+   a) Définir un auto encoder nuage de points 3D :
+      - entrée "3N" : un ensemble de n points dans \[-1; 1]<sup>3</sup>
+      - encodeur : 3N -> FC 512 -> ReLU -> FC 128 -> ReLU -> FC 2
+      - (on récupère un vecteur latent de taille 2)
+      - décodeur  : 2 -> FC 128 -> ReLU -> FC 512 -> ReLU -> FC 3N -> tanh
+      - sortie de même dimension que l'entrée
+   b) Définir la fonction de coût "distance de Chamfer" en ne se servant que d'un MLP
+   c) Générer des nuages de points pour entraîner le réseau
 5) Développement selon nos envies
 6) On pourra voir les autres méthodes sans les implémenter.
 
@@ -32,7 +38,7 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
 - 23/01
   - On a choisi le **framework** de deep learning **PyTorch** plutôt que TensorFlow ou Keras.
   - Les CNN (Convolutional Neural Network) sont des réseaux de neurones spécialement conçus pour travailler sur des images.
- [ImageNet](http://www.image-net.org/) est une base de données d'images contenant plus de 4<sup10</sup> catégories et 2<sup>10</sup> images par catégories.
+ [ImageNet](http://www.image-net.org/) est une base de données d'images contenant plus de 4<sup>10</sup> catégories et 2<sup>10</sup> images par catégories.
  Parmi les différents **CNN** existants, on a choisi **VGG** (développé par Visual Geometry Group) pour ses performances et sa simplicité.
   - Via PyTorch, on a accès à différentes versions de réseaux VGG préentrainés sur ImageNet. On se servira par exemple de *VGG16* (réseau de neurones à 16 couches, sans "batch normalisation") https://pytorch.org/docs/master/torchvision/models.html#torchvision.models.vgg16.
 
@@ -41,8 +47,8 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
   - Précision de tâches du cahier des charges (t-SNE)
 
 - 08/02
-  - visualisation t-SNE validée
-  - Précision de tâches du cahier des charges (entraînement, openGL)
+  - Visualisation t-SNE validée
+  - Précision de tâches du cahier des charges (entraînement d'un réseau de neurone simple, openGL)
 
 
 - 13/02
@@ -50,7 +56,10 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
   - Précision de tâches du cahier des charges (implémentation des fonctions de coût, génération 3D, openGL)
 
 - 19/02
+  - Explication de l'article de Groueix
+  - Précision de tâches du cahier des charges (entraînement d'un autoencoder de nuage de points avec la distance de Chamfer)
 
+- 26/02
  
 Projet effectué à l'UPMC dans le master DAC pour le M1S2 de l'année 2018/2019.
 Encadrants : Vincent Guigue & Nicolas Baskiotis.
