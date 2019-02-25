@@ -3,7 +3,7 @@ import tSNE
 import numpy as np
 
 
-class simpleClassifier(torch.nn.Module):
+class SimpleClassifier(torch.nn.Module):
     def __init__(self, D_in, D_out):
         super(simpleClassifier, self).__init__()
         self.linear = torch.nn.Linear(D_in, D_out)
@@ -11,15 +11,10 @@ class simpleClassifier(torch.nn.Module):
         #self.logprob = torch.nn.LogSoftmax(dim=1)
 
     def forward(self, x):
-        """
-        In the forward function we accept a Tensor of input data and we must return
+        """In the forward function we accept a Tensor of input data and we must return
         a Tensor of output data. We can use Modules defined in the constructor as
-        well as arbitrary operators on Tensors.
-        """
+        well as arbitrary operators on Tensors"""
         return self.linear(x)
-
-        #x = self.linear(x)
-        #return x
     
     def fit(self, list_x, list_y, epochs, t_eval, test_x, test_y):
         """x, y : tensors holdind inputs and outputs"""
@@ -78,8 +73,8 @@ class simpleClassifier(torch.nn.Module):
 
 
 def _main():
-    chosenSubSet = [0, 2] #points rouge et noir qui sont bien DISTINCTS sur la visualisation tSNE
-    #chosenSubSet = [2, 7] #verts et gris qui sont CONFONDUS sur notre INSTANCE du tSNE
+    #chosenSubSet = [0, 2] #points rouge et noir qui sont bien DISTINCTS sur la visualisation tSNE
+    chosenSubSet = [2, 7] #verts et gris qui sont CONFONDUS sur notre INSTANCE du tSNE
     nCat = len(chosenSubSet)
     nPerCat = 100
     nPerObj = 1
@@ -100,7 +95,7 @@ def _main():
     test_y = [labels[i] for i in indexes[n_train:]]
     
     #construction de notre modèle
-    model = simpleClassifier(len(latentVectors[0]), nCat)
+    model = SimpleClassifier(len(latentVectors[0]), nCat)
     
     #apprentissage
     epochs = 1000 #aura convergé avant
