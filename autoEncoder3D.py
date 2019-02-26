@@ -14,7 +14,7 @@ def chamfer(Y, S):
     #loss+= torch.sum(torch.tensor([torch.min(torch.tensor([torch.pow(torch.norm(y - s), 2).item() for y in Y])).item() for s in S]))
     
     loss = torch.sum(torch.min(torch.pow(torch.norm(Y - S), 2)))
-    loss+= torch.sum(torch.min(torch.pow(torch.norm(Y - S), 2)))
+    loss += torch.sum(torch.min(torch.pow(torch.norm(Y - S), 2)))
     #for p in P:
     #    loss += min((y[p] - s) ** 2 for s in S)
     #for s in S:
@@ -43,7 +43,7 @@ class AutoEncoder3D(torch.nn.Module):
             torch.nn.Linear(512, D_in * space_dim),
             torch.nn.Tanh()
         )
-        
+    
     def forward(self, x):
         x = x.view(-1)
         x = self.encoder(x)
@@ -87,8 +87,7 @@ class AutoEncoder3D(torch.nn.Module):
         
         #apprentissage fini, passage en mode évaluation
         self.eval()
-
-
+    
 def gen_sphere(n_spheres, n_points, n_dim=3, center_range=.5, radius_range=.25, bruit=None):
     assert radius_range + center_range <= 1
     assert n_points % n_spheres == 0
@@ -100,16 +99,16 @@ def gen_sphere(n_spheres, n_points, n_dim=3, center_range=.5, radius_range=.25, 
         radius = random.uniform(0, radius_range)
         
         for _ in range(n_per_spheres):
-            r = radius + (bruit() if bruit is not None else 0)
+            r = radius + (bruit[0](*bruit[1]) if bruit is not None else 0)
             orientation = np.random.uniform(-1, 1, n_dim)
             orientation *= r / np.sqrt(np.square(orientation).sum())
             points.append(center + orientation)
     
     return torch.tensor(points).float()
-    
-    #boules
-    #gaussiennes
-    #plan #droite #courbes
+
+#boules
+#gaussiennes
+#plan #droite #courbes
 
 
 def gen_plan(n_plan, n_per_plan, bruit=None):
@@ -124,9 +123,9 @@ def gen_plan(n_plan, n_per_plan, bruit=None):
         
         for _ in range(n_per_plan):
             x, y = [random.uniform(-1, 1) for _ in range(2)]
-            z = -(a*x + b*x + d) + (bruit() if bruit is not None else 0)
-            points.append([x,y,z])
-        
+            z = -(a * x + b * x + d) + (bruit[0](*bruit[1]) if bruit is not None else 0)
+            points.append([x, y, z])
+    
     #todo
     raise NotImplementedError("remttre dans -1 1")
     return torch.tensor(points).float()
@@ -141,14 +140,18 @@ def _main():
     from mpl_toolkits.mplot3d import Axes3D
     
     ratio_train = .9
-    n_models = 100
+    n_models = 32
     n_train = int(n_models * ratio_train)
     
-    n_points = 100
+    n_points = 360
     space_dim = 3
-    latent_size = 8
+    latent_size = 5
     
-    nuages = [gen_sphere(2, n_points) for i in range(n_models)]
+    #nuages = [gen_sphere(2, n_points) for i in range(n_models)]
+    nuages = [gen_sphere(i%5+1, n_points, radius_range=0, bruit=(np.random.normal, (0, .2))) for i in range(n_models)]
+    ax = plt.axes(projection='3d')
+    ax.scatter(nuages[0][:, 0], nuages[0][:, 1], nuages[0][:, 2])
+    plt.show()
     
     #construction de notre modèle
     model = AutoEncoder3D(n_points, space_dim, latent_size)
@@ -156,7 +159,7 @@ def _main():
     #apprentissage
     epochs = 50
     
-    model.fit(nuages[:n_train], epochs, epochs//10, nuages[n_train:])
+    model.fit(nuages[:n_train], epochs, epochs // 10, nuages[n_train:])
     
     for n in nuages:
         ax = plt.axes(projection='3d')
@@ -164,6 +167,7 @@ def _main():
         ax.scatter(n[:, 0], n[:, 1], n[:, 2])
         ax.scatter(y_pred[:, 0], y_pred[:, 1], y_pred[:, 2])
         plt.show()
+
 
 def main():
     import ply
