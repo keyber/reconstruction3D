@@ -28,8 +28,14 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
       - sortie de même dimension que l'entrée
    2) Définir la fonction de coût "distance de Chamfer" en ne se servant que d'un seul MLP
    3) Générer des nuages de points pour entraîner le réseau
-5) Développement selon nos envies
-6) On pourra voir les autres méthodes sans les implémenter.
+5) Etoffer travail précédent:
+   - calculer MSE en plus de Chamfer
+   - visualiser résultat en fonction de coût
+   - coût en fonction de taille du vecteur latent
+6) Implémentation de la technique de l'échantillonage du carré unitaire
+7) Implémentation du décodeur avec le vecteur latent de VGG 
+n-1) Développement selon nos envies
+n) On pourra voir les autres méthodes sans les implémenter.
 
 
 ## Carnet de bord
@@ -60,6 +66,8 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
   - Précision de tâches du cahier des charges (entraînement d'un autoencoder de nuage de points avec la distance de Chamfer)
 
 - 26/02
+  - Précision de tâches du cahier des charges (lien qualitatif-quantitatif, chamfer-taille_latente, MSE-taille_latente)
+
  
 Projet effectué à l'UPMC dans le master DAC pour le M1S2 de l'année 2018/2019.
 Encadrants : Vincent Guigue & Nicolas Baskiotis.
