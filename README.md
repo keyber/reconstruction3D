@@ -34,8 +34,8 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
    - coût en fonction de taille du vecteur latent
 6) Implémentation de la technique de l'échantillonage du carré unitaire
 7) Implémentation du décodeur avec le vecteur latent de VGG 
-n-1) Développement selon nos envies
-n) On pourra voir les autres méthodes sans les implémenter.
+99) Développement selon nos envies
+100) On pourra voir les autres méthodes sans les implémenter.
 
 
 ## Carnet de bord
@@ -66,7 +66,7 @@ n) On pourra voir les autres méthodes sans les implémenter.
   - Précision de tâches du cahier des charges (entraînement d'un autoencoder de nuage de points avec la distance de Chamfer)
 
 - 26/02
-  - Précision de tâches du cahier des charges (lien qualitatif-quantitatif, chamfer-taille_latente, MSE-taille_latente)
+  - Précision de tâches du cahier des charges (liens qualitatif / quantitatif, chamfer / taille latente, MSE / taille_latente)
 
  
 Projet effectué à l'UPMC dans le master DAC pour le M1S2 de l'année 2018/2019.
