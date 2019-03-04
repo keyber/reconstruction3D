@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import os
 import loadImage
 import numpy as np
+import ply
 
 
 def tSNE(vectors, nCat):
@@ -38,18 +39,17 @@ def tSNE(vectors, nCat):
             for cat in range(nCat):
                 plt.scatter(Y[cat*perCat:(cat+1)*perCat, 0], Y[cat*perCat:(cat+1)*perCat, 1],
                             c=[colors[cat % len(colors)]])
-    
 
-def _genAll(root, id_category, nPerCat, nPerObj):
+
+def _gen_latent(root, id_category, nPerCat, nPerObj):
     """renvoie un vecteur d'images chargées dans l'ordre
-    taille: id_category * nPerCat * nPerObj
-    """
+    taille: id_category * nPerCat * nPerObj"""
     res = []
     for cat in id_category:
         path = root + str(cat) + "/"
         for key in os.listdir(path)[:nPerCat]:
             sub_path = path + key + "/rendering/"
-    
+            
             with open(sub_path + "renderings.txt") as f:
                 cpt = 0
                 for line in f:
@@ -57,8 +57,34 @@ def _genAll(root, id_category, nPerCat, nPerObj):
                     cpt += 1
                     if cpt == nPerObj:
                         break
-            
+    
     return res  #torch.utils.data.DataLoader(res, nPerCat)
+
+
+def _gen_clouds(root, id_category, nPerCat, ratio_sous_echantillonage):
+    root += "/"
+    res = []
+    for cat in id_category:
+        path = root + str(cat) + "/ply/"
+        cpt = 0
+        for key in os.listdir(path):
+            #ignore les fichiers .txt
+            if key[-4:] != ".txt":
+                sub_path = path + key
+                cloud = ply.read_ply(sub_path)['points']
+                
+                sub_sampled = []
+                for i, x in enumerate(cloud.values[:, :3]):
+                    if len(sub_sampled) < ratio_sous_echantillonage * (i+1):
+                        sub_sampled.append(torch.tensor(x))
+                        
+                res.append(sub_sampled)
+                
+                cpt += 1
+                if cpt == nPerCat:
+                    break
+    
+    return np.array(res, dtype=torch.Tensor)
 
 
 def _save_latent(latent, root, id_category, nPerCat, nPerObj):
@@ -90,19 +116,25 @@ def _load_latent(root, id_category, nPerCat, nPerObj):
     return latent
 
 
-def get_latent(chosenSubSet, nPerCat, nPerObj):
-    #chargement de la liste des catégories définies pas imageNet
-    root = "../AtlasNet/data/ShapeNetRendering/"
+def _get_categories(path, chosenSubSet):
+    path += "/synsetoffset2category.txt"
+    
     id_category = []
-    with open(root + "synsetoffset2category.txt") as f:
+    with open(path) as f:
         for line in f:
             id_category.append(line.split()[1])
     
     #récupère les catégories des indices demandés
     if chosenSubSet:
         id_category = [id_category[i] for i in chosenSubSet]
-    
+    return id_category
+
+
+def get_latent(chosenSubSet, nPerCat, nPerObj):
+    id_category = _get_categories("../AtlasNet/data/ShapeNetRendering/", chosenSubSet)
+    root = "../AtlasNet/data/ShapeNetRendering"
     local_path = "./data/latentVectors"
+    
     try:
         #chargement des vecteurs latents
         latentVectors = _load_latent(local_path, id_category, nPerCat, nPerObj)
@@ -111,7 +143,7 @@ def get_latent(chosenSubSet, nPerCat, nPerObj):
         print("sauvegarde à l'emplacement", local_path)
         
         #chargement des images
-        images = _genAll(root, id_category, nPerCat, nPerObj)
+        images = _gen_latent(root, id_category, nPerCat, nPerObj)
         
         first = images[0]
         print("images:", (len(chosenSubSet), nPerCat, nPerObj), "=", len(images), type(first))
@@ -135,9 +167,25 @@ def get_latent(chosenSubSet, nPerCat, nPerObj):
     return latentVectors
 
 
+def get_clouds(chosenSubSet, nPerCat, ratio):
+    assert 0 < ratio <= 1
+    id_category = _get_categories("../AtlasNet/data/customShapeNet/", chosenSubSet)
+    path = "../AtlasNet/data/customShapeNet"
+    return _gen_clouds(path, id_category, nPerCat, ratio)
+
+
+def write_clouds(clouds):
+    import pandas
+    path = "./data/output_clouds"
+    if not os.path.isdir(path):
+        os.mkdir(path)
+    path += '/'
+    for i, c in enumerate(clouds):
+        ply.write_ply(path + str(i), pandas.DataFrame(c), as_text=True, text=True)
+
+
 def genModel():
-    """
-    Une image est de taille (224,224,3) = 150528,
+    """Une image est de taille (224,224,3) = 150 528,
     le modèle la résume en un vecteur de dimensions (512, 7, 7) = 25 088"""
     vgg = models.vgg16(pretrained=True)
     vgg = vgg.features
@@ -150,7 +198,7 @@ def genModel():
 def _test():
     vgg = models.vgg16(pretrained=True)
     #récupère une image
-    im = _genAll("../AtlasNet/data/ShapeNetRendering/", ["02691156"], 1, 1)[0]
+    im = _gen_latent("../AtlasNet/data/ShapeNetRendering/", ["02691156"], 1, 1)[0]
     l = list(vgg.features.children()) + list(vgg.classifier.children())
     
     print("taille des couches")

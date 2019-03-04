@@ -3,7 +3,6 @@ import torchvision.transforms as transforms
 from torch.autograd import Variable
 from PIL import Image
 
-
 def loadLabels():
     import os
     import numpy as np
