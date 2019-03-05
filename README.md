@@ -68,6 +68,12 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
 - 26/02
   - Précision de tâches du cahier des charges (liens qualitatif / quantitatif, chamfer / taille latente, MSE / taille_latente)
 
+- 05/03
+  - Analyse du compte rendu actuel : t-SNE OK. auto-encodeur 3D à mieux expliquer, tracer erreur en fonction du nombre d'epoch. Afficher des statistiques par classes de nuages. Visualiser des regroupements en clusters en utilisant un espace latent de taille 2.
+  - Analyse du code du reconstructeur.
+  - Face au problème de performances de la distance de Chamfer, Google Colab a été mentionné.
+
+- 12/03
  
 Projet effectué à l'UPMC dans le master DAC pour le M1S2 de l'année 2018/2019.
 Encadrants : Vincent Guigue & Nicolas Baskiotis.
