@@ -245,9 +245,10 @@ def _main():
     #draw_cloud(ax, clouds[0])
     #plt.show()
     
+    _main_fit_forward_draw(clouds, (n_points, space_dim, 2, 50), 400*len(cloud_generator))
+    
     _main_plot_cross_validation(clouds, n_points, space_dim, epochs, n_cross_validation)
     
-    _main_fit_forward_draw(clouds, (n_points, space_dim, 2, 50), 400*len(cloud_generator))
 
 
 if __name__ == '__main__':

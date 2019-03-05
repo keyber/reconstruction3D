@@ -169,8 +169,8 @@ def get_latent(chosenSubSet, nPerCat, nPerObj):
 
 def get_clouds(chosenSubSet, nPerCat, ratio):
     assert 0 < ratio <= 1
-    id_category = _get_categories("../AtlasNet/data/customShapeNet/", chosenSubSet)
     path = "../AtlasNet/data/customShapeNet"
+    id_category = _get_categories(path, chosenSubSet)
     return _gen_clouds(path, id_category, nPerCat, ratio)
 
 
