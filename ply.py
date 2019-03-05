@@ -239,10 +239,9 @@ def describe_element(name, df, normal=False, text = False, color=False):
         element.append('property float y')
         element.append('property float z')
         
-        # BLOC ENLEVE PAR KEYVAN
-        #if text:
-        #    element.append('property float u')
-        #    element.append('property float v')
+        if text:
+           element.append('property float u')
+           element.append('property float v')
         
         if normal:
             element.append('property float nx')

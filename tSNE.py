@@ -174,14 +174,16 @@ def get_clouds(chosenSubSet, nPerCat, ratio):
     return _gen_clouds(path, id_category, nPerCat, ratio)
 
 
-def write_clouds(clouds):
+def write_clouds(path, clouds):
     import pandas
-    path = "./data/output_clouds"
-    if not os.path.isdir(path):
+    if os.path.isdir(path):
+        print(path, "écrasé")
+    else :
+        print(path, "écrit")
         os.mkdir(path)
     path += '/'
     for i, c in enumerate(clouds):
-        ply.write_ply(path + str(i), pandas.DataFrame(c), as_text=True, text=True)
+        ply.write_ply(path + str(i), pandas.DataFrame(c), as_text=True)
 
 
 def genModel():

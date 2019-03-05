@@ -18,8 +18,8 @@ def chamfer(Y, S):
     global chamfer_verbose
 
     if chamfer_verbose:
-        print(type(Y), Y.shape)
-        print(type(S), S.size)
+        print("Y:", type(Y), Y.shape)
+        print("S:", type(S), S.shape)
     
     # Je n'arrive pas à travailler avec les tensors directement :
     # Pas la même taille :
@@ -51,14 +51,14 @@ def chamfer(Y, S):
         #print(type(normes), normes.size())
         #print(loss1.item(), loss2.item())
         #print(type(normes), normes.shape)
-        print(loss1, loss2)
+        print("loss:", type(loss1), loss1.item(), loss2.item())
         chamfer_verbose = False
     
     return loss1 + loss2
     
 
 class Reconstructeur(nn.Module):
-    def __init__(self, n_mlp, space_dim, latent_size, grid_points, epochs):
+    def __init__(self, n_mlp, space_dim, latent_size, grid_points, grid_size, epochs):
         super().__init__()
         self.space_dim = space_dim
         self.epochs = epochs
@@ -74,7 +74,7 @@ class Reconstructeur(nn.Module):
             nn.Tanh()
         ) for _ in range(n_mlp)])
         
-        points_dim = [np.linspace(0, 1, grid_points) for _ in range(space_dim)]
+        points_dim = [np.linspace(0, grid_size, grid_points) for _ in range(space_dim)]
         points_dim = np.meshgrid(*points_dim)
         
         def f(*point_dim):
@@ -138,30 +138,36 @@ def draw_cloud(ax, c):
     
 def _main():
     chosen_subset = [0]
-    n_per_cat = 2
+    n_per_cat = 1
     latent = tSNE.get_latent(chosen_subset, n_per_cat, nPerObj=1)
     clouds = tSNE.get_clouds(chosen_subset, n_per_cat, ratio=.002)
-    
+
+    tSNE.write_clouds("./data/output_clouds/ground_truth", [[p.detach().numpy() for p in clouds[0]]])
+    exit()
     ratio_train = 1
     n_train = int(ratio_train * len(latent))
     
     indexes = list(range(len(latent)))
-    random.shuffle(indexes)
+    #random.shuffle(indexes)
     train_x = [latent[i] for i in indexes[:n_train]]
     test_x = [latent[i] for i in indexes[n_train:]]
     train_y = [clouds[i] for i in indexes[:n_train]]
     test_y = [clouds[i] for i in indexes[n_train:]]
 
-    n_mlp = 5
+    n_mlp = 10
     space_dim = 3
-    latent_size = 25088 #défini par l'encodeur utilisé
-    grid_points = 2
+    latent_size = 25088 # défini par l'encodeur utilisé
+    grid_points = 2 # au cube
+    grid_size = 100
     epochs = 10
-    reconstructeur = Reconstructeur(n_mlp, space_dim, latent_size, grid_points, epochs)
+    
+    reconstructeur = Reconstructeur(n_mlp, space_dim, latent_size, grid_points, grid_size, epochs)
     
     reconstructeur.fit(train_x, train_y, test_x, test_y)
     
-    #tSNE.write_clouds(reconstructeur.forward(clouds[0]))
+    output = reconstructeur.forward(latent[0])
+    output = [p.detach().numpy() for p in output]
+    tSNE.write_clouds("./data/output_clouds", [output])
 
 if __name__ == '__main__':
     _main()
