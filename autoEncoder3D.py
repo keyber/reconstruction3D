@@ -245,7 +245,7 @@ def _main():
     #draw_cloud(ax, clouds[0])
     #plt.show()
     
-    _main_fit_forward_draw(clouds, (n_points, space_dim, 2, 50), 400*len(cloud_generator))
+    #_main_fit_forward_draw(clouds, (n_points, space_dim, 2, 50), 400*len(cloud_generator))
     
     _main_plot_cross_validation(clouds, n_points, space_dim, epochs, n_cross_validation)
     
@@ -253,3 +253,14 @@ def _main():
 
 if __name__ == '__main__':
     _main()
+
+"""
+moins de points ex 30
+espace latent de 20
+rajouter une couche 64
+
+stats par type de forme err std
+
+visualiser regroupement en clusters avec espace latent de taille 2
+
+google colab"""
