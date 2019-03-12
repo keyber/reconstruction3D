@@ -17,7 +17,7 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
     - Chargement d'un modèle (vgg/ResNet) sur PyTorch (lecture de tutoriels PyTorch)
     - Exécuter l'algorithme forward du modèle (image -> vecteur latent) sur un sous-ensemble d'image et vérifier son bon fonctionnement en affichant le [t-SNE](https://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html) des vecteurs latents.
     - Afficher des nuages de points (matplotlib et/ou logiciel annexe)
-    - Afficher des nuages de points avec OpenGL
+    - Afficher des nuages de points avec PyOpenGL / [Open3D](http://www.open3d.org/): L'affichage final se fera uniquement en Open3D. 
 3) Entraîner un réseau de neurones simple classifiant les objets à partir de leur représentation latente. Le réseau de neurones est composé d'une seule couche, cette couche est linéaire.
 4)
    1) Définir un auto encoder nuage de points 3D :
