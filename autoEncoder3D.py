@@ -30,20 +30,24 @@ class AutoEncoder3D(torch.nn.Module):
         super().__init__()
         self.space_dim = space_dim
         self.encoder = torch.nn.Sequential(
-            torch.nn.Linear(D_in * space_dim, 512),
+            torch.nn.Linear(D_in * space_dim, 128),
             torch.nn.ReLU(),
-            torch.nn.Linear(512, 128),
+            torch.nn.Linear(128, 64),
             torch.nn.ReLU(),
-            torch.nn.Linear(128, bottleneck_size),
+            torch.nn.Linear(64, 32),
+            torch.nn.ReLU(),
+            torch.nn.Linear(32, bottleneck_size),
             torch.nn.ReLU()
         )
         
         self.decoder = torch.nn.Sequential(
-            torch.nn.Linear(bottleneck_size, 128),
+            torch.nn.Linear(bottleneck_size, 32),
             torch.nn.ReLU(),
-            torch.nn.Linear(128, 512),
+            torch.nn.Linear(32, 64),
             torch.nn.ReLU(),
-            torch.nn.Linear(512, D_in * space_dim),
+            torch.nn.Linear(64, 128),
+            torch.nn.ReLU(),
+            torch.nn.Linear(128, D_in * space_dim),
             torch.nn.Tanh()
         )
         self.epochs = epochs
@@ -55,10 +59,16 @@ class AutoEncoder3D(torch.nn.Module):
         x = self.decoder(x)
         return x.view(-1, self.space_dim)
     
-    def fit(self, x_train, x_test):
+    def encode(self, x):
+        return self.encoder(x.view(-1)).detach().numpy()
+    
+    def fit(self, x_train, x_test, lr=1e-4):
         """liste de nuages de points 3D"""
         
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-4)
+        optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+        list_loss_train = []
+        list_loss_test = []
+        list_test_ind = []
         
         for t in range(self.epochs):
             s_train = 0
@@ -69,17 +79,22 @@ class AutoEncoder3D(torch.nn.Module):
                 assert y_pred.requires_grad
                 
                 loss = chamfer(y_pred, x)
-                s_train += loss.item() / len(x_train)
                 
+                s_train += loss.item() / len(x_train)
                 # Zero gradients, perform a backward pass, and update the weights.
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
             
-            if self.verbose and t % (self.epochs // 10) == 0:
+            list_loss_train.append(s_train)
+            
+            if self.verbose and (t==0 or (t+1) % (self.epochs // 10) == 0):
                 self.eval()
                 
-                s_test = sum(chamfer(self.forward(x), x.data).item() for x in x_test)
+                list_test_ind.append(t)
+                
+                s_test = sum(chamfer(self.forward(x), x.data).item() for x in x_test)/len(x_test) if len(x_test) else 0
+                list_loss_test.append(s_test)
                 
                 print("time", t,
                       "loss train %.1e" % s_train,
@@ -92,9 +107,9 @@ class AutoEncoder3D(torch.nn.Module):
         
         #apprentissage fini, passage en mode évaluation
         self.eval()
-        if len(x_test) != 0:
-            return s_train, sum(chamfer(self.forward(x), x.data).item() for x in x_test) / len(x_test)
-        return s_train
+        if len(x_test):
+            return list_loss_train, list_loss_test, list_test_ind
+        return list_loss_train
 
 
 def gen_sphere(n_spheres, n_points, n_dim=3, center_range=.5, radius_range=.25, bruit=None):
@@ -116,31 +131,7 @@ def gen_sphere(n_spheres, n_points, n_dim=3, center_range=.5, radius_range=.25, 
     return torch.tensor(points).float()
 
 
-def gen_plan(n_plan, n_per_plan, bruit=None):
-    """plan : ax + by + cz + d = 0
-    génère le plan en choisissant aléatoirement a, b et d (mais pas c)
-    génère les coordonnées x et y aléatoirement dans [-1; 1]
-                           z est déduit par z = - (ax + by + d)
-    on scale les valeurs de z pour aller dans [-1; 1]"""
-    points = []
-    for _ in range(n_plan):
-        a, b, d = [random.uniform(-1, 1) for _ in range(3)]
-        
-        for _ in range(n_per_plan):
-            x, y = [random.uniform(-1, 1) for _ in range(2)]
-            z = -(a * x + b * x + d) + (bruit[0](*bruit[1]) if bruit is not None else 0)
-            points.append([x, y, z])
-    
-    #todo
-    raise NotImplementedError("remettre dans -1 1")
-    return torch.tensor(points).float()
-    
-    #boules
-    #gaussiennes
-    #plan #droite #courbes
-
-
-def cross_validation(model_param, data, fold=5):
+def cross_validation(model_param, data, fold=5, lr=1e-4):
     if len(data) % fold != 0:
         raise ValueError("les " + str(len(data)) + " données ne sont pas partionables exactement en train test avec "
                          + str(fold) + "folds")
@@ -159,9 +150,9 @@ def cross_validation(model_param, data, fold=5):
             data_test = data[batch_size * i: batch_size * (i + 1)]
             data_train = data[:batch_size * i] + data[batch_size * (i + 1):]
             
-            p_train, p_test = model.fit(data_train, data_test)
+            p_train, p_test = model.fit(data_train, data_test, lr)
             
-            acc_train_test.append([p_train, p_test])
+            acc_train_test.append([p_train[-1], p_test[-1]])
         
         acc_train_test = np.array(acc_train_test)
         mean_train.append(np.mean(acc_train_test[:, 0]))
@@ -199,38 +190,57 @@ def _main_fit_forward_draw(clouds, param, n_draw):
         plt.show()
 
 
-def _main_plot_cross_validation(clouds, n_points, space_dim, epochs, n_cross_validation):
-    r = range(2, 10)
+def _main_plot_cross_validation(clouds, n_points, space_dim, n_cross_validation):
+    epochs = [1, 5, 10, 20]
+    latent_sizes = [2]
     #cross validation pour les mesures
-    params = [(n_points, space_dim, latent_size, epochs) for latent_size in r]
-    mean_train, std_train, mean_test, std_test = cross_validation(params, clouds, n_cross_validation)
+    params = [[(n_points, space_dim, latent_size, epoch) for epoch in epochs] for latent_size in latent_sizes]
+    params = np.array(params).reshape((-1, 4))
+    mean_train, std_train, mean_test, std_test = cross_validation(params, clouds, n_cross_validation, lr=1e-5)
     
     #proportion de data utilisé pour les test
     p = 1 / n_cross_validation
     n = len(clouds)
     
     #barres d'erreur à deux écarts types
-    plt.errorbar(r, mean_train, yerr=2 * std_train / np.sqrt(n * (1 - p)), capsize=5)
-    plt.errorbar(r, mean_test, yerr=2 * std_test / np.sqrt(n * p), capsize=5)
+    plt.errorbar(epochs, mean_train, yerr=2 * std_train / np.sqrt(n * (1 - p)), capsize=5)
+    plt.errorbar(epochs, mean_test, yerr=2 * std_test / np.sqrt(n * p), capsize=5)
     plt.show()
 
 
+def _main_clustering(clouds, n_classes, n_points, space_dim):
+    latent_size = 2
+    epochs = 500
+    model = AutoEncoder3D(n_points, space_dim, latent_size, epochs)
+    model.verbose = True
+    n = int(.8*len(clouds))
+    loss_train, loss_test, test_ind = model.fit(clouds[:n], clouds[n:])
+    plt.plot(loss_train)
+    plt.plot(test_ind, loss_test)
+    plt.show()
+    
+    a = np.array([model.encode(c) for c in clouds[:n]])
+    plt.scatter(a[:,0], a[:, 1], c=['r','g','b','c','m'][:n_classes]*(n//n_classes))
+    plt.show()
+
 def _main():
     space_dim = 3
-    epochs = 30
     n_cross_validation = 3
     #fonction de répartition des gaussiennes
     std = .1
     loi = scipy.stats.truncnorm(-.5 / std, .5 / std, 0, std)
     
-    n_points = 96 * 3
-    n_clouds = 3 * 2 * 10
+    n_points = 20
     
-    #1,2 et 3 gaussiennes
+    range_gauss  = range(1,3)
+    range_sphere = range(1,1)
+    
     #ne marche pas : [lambda :gen_sphere(i, ...) for i in range(1,4)]
-    cloud_generator = [(lambda i: lambda: gen_sphere(2, n_points, radius_range=0, bruit=loi.rvs))(i) for i in range(1, 3)]
-    #1 et 2 spheres
-    #cloud_generator += [(lambda i: lambda : gen_sphere(i, n_points))(i) for i in range(1,3)]
+    cloud_generator = [(lambda i: lambda: gen_sphere(i, n_points, radius_range=0, bruit=loi.rvs))(i) for i in range_gauss]
+    cloud_generator += [(lambda i: lambda : gen_sphere(i, n_points))(i) for i in range_sphere]
+    
+    n_clouds = 20 * n_cross_validation * len(cloud_generator)
+    
     
     assert n_clouds % n_cross_validation == 0, "on doit pouvoir couper le dataset en n_cross_validation paquets"
     assert n_clouds // n_cross_validation % len(cloud_generator) == 0, "chaque paquet doit contenir autant de nuages de chaque classe"
@@ -245,18 +255,16 @@ def _main():
     #draw_cloud(ax, clouds[0])
     #plt.show()
     
-    #_main_fit_forward_draw(clouds, (n_points, space_dim, 2, 50), 400*len(cloud_generator))
+    _main_clustering(clouds, len(cloud_generator), n_points, space_dim)
     
-    _main_plot_cross_validation(clouds, n_points, space_dim, epochs, n_cross_validation)
-    
+    # _main_fit_forward_draw(clouds, (n_points, space_dim, 2, 50), 400*len(cloud_generator))
 
+    # _main_plot_cross_validation(clouds, n_points, space_dim, n_cross_validation)
 
 if __name__ == '__main__':
     _main()
 
 """
-moins de points ex 30
-espace latent de 20
 rajouter une couche 64
 
 stats par type de forme err std
