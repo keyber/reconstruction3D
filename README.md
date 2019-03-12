@@ -74,6 +74,12 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
   - Face au problème de performances de la distance de Chamfer, Google Colab a été mentionné.
 
 - 12/03
- 
+  - Visualisation du auto-encoder à expliquer
+  - Visualiser plan vs sphere
+  - Chamfer O(n) ne suffit pas, il faut utiliseer Google Colab
+  - Chamfer doit utiliser des fonctions de pytorch et non de numpy
+
+- 26/03
+
 Projet effectué à l'UPMC dans le master DAC pour le M1S2 de l'année 2018/2019.
 Encadrants : Vincent Guigue & Nicolas Baskiotis.
