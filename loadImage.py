@@ -1,6 +1,6 @@
+import torch
 import torchvision.models as models
 import torchvision.transforms as transforms
-from torch.autograd import Variable
 from PIL import Image
 
 def loadLabels():
@@ -47,7 +47,7 @@ def loadImage(path):
     # Now that we have preprocessed our img, we need to convert it into a
     # Variable; PyTorch models expect inputs to be Variables. A PyTorch Variable is a
     # wrapper around a PyTorch Tensor.
-    return Variable(img)
+    return torch.tensor(img)
 
 
 def top(arr, n=5):

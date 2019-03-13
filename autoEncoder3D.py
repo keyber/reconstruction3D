@@ -13,7 +13,8 @@ def chamfer(Y, S):
     tmp = torch.pow(torch.norm(Y - S, keepdim=True), 2)
     
     #le(s) MLP doivent bien atteindre un Q
-    loss1 = torch.min(tmp)  # NEGLIGEABLE DE 4 ORDRES DE GRANDEURS
+    loss1 = torch.min(tmp)
+    
     #les Q doivent bien être atteint par un MLP
     loss2 = torch.sum(tmp)
     return loss1 + loss2
@@ -130,6 +131,26 @@ def gen_sphere(n_spheres, n_points, n_dim=3, center_range=.5, radius_range=.25, 
     
     return torch.tensor(points).float()
 
+def gen_plan(n_plan, n_per_plan, bruit=None):
+    """plan : ax + by + cz + d = 0
+    génère le plan en choisissant aléatoirement a, b et d (mais pas c)
+    génère les coordonnées x et y aléatoirement dans [-1; 1]
+                           z est déduit par z = - (ax + by + d)
+    on scale les valeurs de z pour aller dans [-1; 1]"""
+    points = []
+    for _ in range(n_plan):
+        a, b, d = [random.uniform(-1, 1) for _ in range(3)]
+
+        for _ in range(n_per_plan):
+            x, y = [random.uniform(-1, 1) for _ in range(2)]
+            z = -(a * x + b * x + d) + (bruit[0](*bruit[1]) if bruit is not None else 0)
+            points.append([x, y, z])
+    points = np.array(points)
+    
+    # remet dans [-1, 1]
+    points[:, 2] = points[:, 2] * (2 / (np.max(points[2,:]) - np.min(points[:,2]))) - 1
+    return torch.tensor(points).float()
+
 
 def cross_validation(model_param, data, fold=5, lr=1e-4):
     if len(data) % fold != 0:
@@ -172,6 +193,7 @@ def _main_fit_forward_draw(clouds, param, n_draw):
     # FIT entrainement sur 100% pour l'affichage
     print("fit en cours")
     model = AutoEncoder3D(*param)
+    model.verbose = True
     print("loss moyenne finale", model.fit(clouds, []))
     
     for i, nuage in enumerate(clouds[:n_draw]):
@@ -180,6 +202,7 @@ def _main_fit_forward_draw(clouds, param, n_draw):
         mse = MSE(y_pred, nuage).item()
         print("modèle", i,
               "MSE", mse,
+              "chamfer", chamfer(y_pred, nuage).item(),
               "\t chamfer = MSE +", chamfer(y_pred, nuage).item() - mse)
         
         # DRAW
@@ -232,12 +255,14 @@ def _main():
     
     n_points = 20
     
-    range_gauss  = range(1,3)
+    range_gauss  = range(1,2)
     range_sphere = range(1,1)
+    range_plan = range(1,2)
     
     #ne marche pas : [lambda :gen_sphere(i, ...) for i in range(1,4)]
     cloud_generator = [(lambda i: lambda: gen_sphere(i, n_points, radius_range=0, bruit=loi.rvs))(i) for i in range_gauss]
     cloud_generator += [(lambda i: lambda : gen_sphere(i, n_points))(i) for i in range_sphere]
+    cloud_generator += [(lambda i: lambda : gen_plan(i, n_points))(i) for i in range_plan]
     
     n_clouds = 20 * n_cross_validation * len(cloud_generator)
     
@@ -251,13 +276,14 @@ def _main():
         for m_gen in cloud_generator:
             clouds.append(m_gen())
     
-    #ax = plt.axes(projection='3d')
-    #draw_cloud(ax, clouds[0])
-    #plt.show()
+    # for i in range(10):
+    #     ax = plt.axes(projection='3d')
+    #     draw_cloud(ax, clouds[i])
+    #     plt.show()
     
     _main_clustering(clouds, len(cloud_generator), n_points, space_dim)
     
-    # _main_fit_forward_draw(clouds, (n_points, space_dim, 2, 50), 400*len(cloud_generator))
+    _main_fit_forward_draw(clouds, (n_points, space_dim, 2, 50), 400*len(cloud_generator))
 
     # _main_plot_cross_validation(clouds, n_points, space_dim, n_cross_validation)
 

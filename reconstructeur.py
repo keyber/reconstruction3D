@@ -19,6 +19,9 @@ class Segmentation:
         self.neighbours, self.distances_2 = self._gen_neighbours()
         # for d in self.distances_2:
         #     print(d,":",self.neighbours[d])
+        
+        # sert à initialiser la matrice
+        self.filler = np.frompyfunc(lambda x: list(), 1, 1)
     
     def _gen_neighbours(self):
         # génère tous les déplacements possibles de -n à n dans chaque dim
@@ -28,28 +31,29 @@ class Segmentation:
         # shift de n pour centrer
         list_neighbours = [voisin - self.n_step for voisin in list_neighbours.reshape(-1, 3)]
         
+        # facteur pour passer de distances entre cases (coordonnées entières) à des distances entre points
+        factor_2 = ((self.coo_max - self.coo_min) / self.n_step) ** 2
+        
         # trie par distance au centre
         # il y a bcp d'équivalents
         # on regroupe les équivalents dans une même liste
         dict_neighbours = {}
-        factor_2 = ((self.coo_max - self.coo_min) / self.n_step) ** 2
         for voisin in list_neighbours:
             # la distance minimale entre des points des deux cases est égale à
-            # la norme du vecteur entre les cases auquel on enlève 1 dans toutes les dimensions non nulles
-            # on scale la distance pour passer de distances entre dans la base des cases à des distances entre points
+            # la norme du vecteur entre les cases auquel on ENLEVE 1 DANS TOUTES LES DIMENSIONS NON NULLES
             # on laisse tout au carré
             d2 = np.sum(np.power(np.maximum(np.abs(voisin) - 1, 0), 2)) * factor_2
             
             # une dimension égale à 1 devient équivalente à une dimension nulle
-            # on ajoute un terme négligeable pour mettre en premiers les cases plus proches du centre
+            # on ajoute un terme négligeable pour mettre en premiers les cases les plus proches du centre
             d2 += (np.abs(voisin) == 1).sum() * 1e-6
             
             if d2 not in dict_neighbours:  # pas de pb d'arrrondi car on travaille sur des entiers, puis effectue les mêmes opérations
                 dict_neighbours[d2] = []
             
-            voisin = torch.tensor(voisin)
-            voisin.requires_grad = False
             dict_neighbours[d2].append(voisin)
+        
+        dict_neighbours = {k: np.array(v) for (k, v) in dict_neighbours.items()}
         
         # calcule la liste triée des distances
         list_dist_2 = np.array(sorted(list(dict_neighbours.keys())))
@@ -57,22 +61,28 @@ class Segmentation:
         return dict_neighbours, list_dist_2
     
     def get_neighbours(self, cell, dist):
-        res = [v.numpy() + cell for v in self.neighbours[dist]]
+        """retourne la liste des cases à distance dist de cell"""
+        # ajoute notre position pour calculer les coordonnées des voisins
+        res = cell + self.neighbours[dist]
+        
+        # filtre les voisins qui sortent du tableau
         return [v for v in res if np.all((0 <= v) & (v < self.n_step))]
     
     def gen_matrix(self):
-        filler = np.frompyfunc(lambda x: list(), 1, 1)
+        """retourne un tableau 3D servant à stocker les points"""
         a = np.empty((self.n_step, self.n_step, self.n_step), dtype=list)
-        return filler(a, a)
+        return self.filler(a, a)
     
     def get_mat_coo(self, point):
-        # res = [int((coo - self.coo_min) / (self.coo_max - self.coo_min) * self.n_step) for coo in point]
+        """retourne les coordonnées de la case du tableau contenant ce point"""
         res = [int((coo + 1) * self.n_step_2) for coo in point]
+        #<=> int((coo - self.coo_min) / (self.coo_max - self.coo_min) * self.n_step)
         
         # si une coordonnée est maximale (càd 1), le point sort du tableau, on le met dans la case d'avant
         return [min(x, self.n_step - 1) for x in res]
     
     def get_float_coo(self, point):
+        """retourne les coordonnées de notre point dans la base des cases du tableau"""
         return np.minimum((point + 1) * self.n_step_2, self.n_step - 1)
 
 
@@ -81,31 +91,35 @@ class Nuage:
     d'une liste de points et
     d'un tableau à 3 dimensions"""
     
-    points_parcourus = []
-    max_list = []
-    
     def __init__(self, points, segmentation):
         self.segmentation = segmentation
         self.liste_points = points
+        
+        # crée le tableau
         self.mat = segmentation.gen_matrix()
         
+        # remplit le tableau
         for p in self.liste_points:
             x, y, z = self.segmentation.get_mat_coo(p)
             self.mat[x, y, z].append(p)
         
-        self.filler = np.frompyfunc(lambda x: list(), 1, 1)
-    
     def recreate(self, points):
         """vide et re-rempli l'ancien tableau plutôt que de le supprimer et d'en allouer un nouveau"""
-        self.filler(self.mat, self.mat)
-        
         self.liste_points = points
         
+        # vide
+        self.segmentation.filler(self.mat, self.mat)
+        
+        # remplit
         for p in self.liste_points:
             x, y, z = self.segmentation.get_mat_coo(p)
             self.mat[x, y, z].append(p)
         
         return self
+    
+
+    # pour afficher des statistiques: liste du nombre de points parcourus pour chaque appel à get_closest
+    points_parcourus = []
     
     def get_closest(self, point):
         # calcule la case dans laquelle tomberait le point
@@ -126,7 +140,7 @@ class Nuage:
             # considère toutes les cases non vides à distance d de notre case
             neighbours = [v for v in self.segmentation.get_neighbours(case_coo, d_2) if self.mat[v[0], v[1], v[2]]]
             
-            # calcule la distance entre notre point et l'angle le plus proche de la case
+            # calcule la distance entre notre point et le sommet de la case le plus proche
             precise_dist_2 = [(np.sum(np.power(point_coo - v, 2)), v) for v in neighbours]
             
             # enlève les cases dont la distance min est trop grande
@@ -136,12 +150,13 @@ class Nuage:
             for real_d_2, v in sorted(precise_dist_2, key=lambda x: x[0]):
                 if real_d_2 > closest_point:
                     break
+                    
                 cpt_point_parcourus += len(self.mat[v[0], v[1], v[2]])
+                
                 # regarde si le point le plus proche parmi tous les points de la case est mieux
-                candidat = min(torch.sum(torch.pow(point - p, 2), dim=(0,)) for p in self.mat[v[0], v[1], v[2]])
+                candidat = torch.min(torch.cat([torch.sum(torch.pow(point - p, 2), dim=(0,)).unsqueeze(0) for p in self.mat[v[0], v[1], v[2]]]))
                 if candidat < closest_point:
                     closest_point = candidat
-            
             else:
                 continue  # only executed if the inner loop did NOT break
             break  # only executed if the inner loop DID break
@@ -151,8 +166,8 @@ class Nuage:
         return closest_point
     
     def chamfer(self, other):
-        loss0 = sum(self.get_closest(p) for p in other.liste_points)
-        loss1 = sum(other.get_closest(p) for p in self.liste_points)
+        loss0 = torch.sum(torch.cat([self.get_closest(p).unsqueeze(0) for p in other.liste_points]))
+        loss1 = torch.sum(torch.cat([other.get_closest(p).unsqueeze(0) for p in self.liste_points]))
         return loss0, loss1
 
 
@@ -315,10 +330,9 @@ def fit_reconstructeur(reconstructeur, x_train, y_train, x_test, y_test, epochs,
     
     for epoch in range(epochs):
         loss_train = 0
+        t_tot = time.time()
         for x, y in zip(x_train, y_train):
             assert not x.requires_grad
-            
-            t_tot = time.time()
             
             y_pred = reconstructeur.forward(x)
             
@@ -334,7 +348,7 @@ def fit_reconstructeur(reconstructeur, x_train, y_train, x_test, y_test, epochs,
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            time_tot[epoch] += time.time() - t_tot
+        time_tot[epoch] += time.time() - t_tot
         
         if reconstructeur.verbose and (epochs < 10 or epoch % (epochs // 10) == 0):
             reconstructeur.eval()
@@ -342,8 +356,8 @@ def fit_reconstructeur(reconstructeur, x_train, y_train, x_test, y_test, epochs,
             s_test = sum(sum(reconstructeur.loss(reconstructeur.forward(x), y.data)).item() for (x, y) in zip(x_test, y_test))
             
             print("time", epoch,
-                  "loss train %.1e" % loss_train,
-                  "loss test %.1e" % s_test)
+                  "loss train %.4e" % loss_train,
+                  "loss test %.2e" % s_test)
             reconstructeur.train()
         
         if loss_train / len(x_train) < 1e-8:
@@ -393,25 +407,25 @@ def _main():
     train_y2 = [clouds2[i] for i in indexes[:n_train]]
     test_y2 = [clouds2[i] for i in indexes[n_train:]]
     
-    n_mlp = 1
+    n_mlp = 10
     latent_size = 25088  # défini par l'encodeur utilisé
-    grid_points = 1
-    epochs = 10
+    grid_points = 8
+    epochs = 5
     grid_size = 1e0
-    lr = 1e-1
+    lr = 1e-4
     
     reconstructeur = Reconstructeur(n_mlp, latent_size, grid_points, segmentation)
     
     t = time.time()
     for _ in range(1):
         loss, t_loss, t_tot = fit_reconstructeur(reconstructeur, train_x, train_y, test_x, test_y, epochs, lr=lr, grid_scale=grid_size)
-        print("temps: ")
+        print("\ntemps: ")
         print("loss", sum(t_loss), t_loss)
         print("tot", sum(t_tot), t_tot)
         print("ratio", sum(t_loss)/sum(t_tot), t_loss/t_tot)
     print("O(n)", time.time() - t)
     
-    print("répartition point segmentation")
+    print("répartition point parcourus")
     print(np.histogram(Nuage.points_parcourus))
     print(np.mean(Nuage.points_parcourus))
     # print(segmentation.distances_2)
@@ -420,6 +434,7 @@ def _main():
     output = [p.detach().numpy() for p in output.liste_points]
     tSNE.write_clouds("./data/output_clouds", [output])
     
+    exit()
     print("reconstructeur O(n2) : ")
     reconstructeur2 = Reconstructeur2(n_mlp, latent_size, grid_points)
     t = time.time()
