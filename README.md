@@ -78,6 +78,8 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
   - Visualiser plan vs sphere
   - Chamfer O(n) ne suffit pas, il faut utiliseer Google Colab
   - Chamfer doit utiliser des fonctions de pytorch et non de numpy
+  - L'affichage des résultats se fera en Open3D pour pallier les probèmes rencontrés avec PyOPenGL.
+  - Importer / coder une des techniques de reconstruction 3D existantes afin de l'utiliser comme une baseline pour l'évaluation de notre modèle.
 
 - 26/03
 
