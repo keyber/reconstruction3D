@@ -3,6 +3,7 @@ from torch import nn
 import numpy as np
 import tSNE
 import time
+import matplotlib.pyplot as plt
 
 
 class Segmentation:
@@ -18,10 +19,11 @@ class Segmentation:
 
         # facteur pour passer de distances entre cases à des distances entre points
         self.factor_2 = ((self.coo_max - self.coo_min) / self.n_step) ** 2
-
+        
+        # ensemble des déplacements(/voisins) possibles, ordonnés par leur distances
         self.neighbours, self.distances_2 = self._gen_neighbours()
         
-        # sert à initialiser la matrice
+        # sert à initialiser la matrice des nuages
         self.filler = np.frompyfunc(lambda x: list(), 1, 1)
     
     def _gen_neighbours(self):
@@ -40,7 +42,10 @@ class Segmentation:
             # la distance minimale entre des points des deux cases est égale à
             # la norme du vecteur entre les cases auquel on ENLEVE 1 DANS TOUTES LES DIMENSIONS NON NULLES
             # on laisse tout au carré
-            d2 = np.sum(np.power(np.maximum(np.abs(voisin) - 1, 0), 2)) * self.factor_2
+            d2 = np.sum(np.power(np.maximum(np.abs(voisin) - 1, 0), 2))
+            
+            # convertit la distance entre cases en une distance entre point
+            d2 *= self.factor_2
             
             # une dimension égale à 1 devient équivalente à une dimension nulle
             # on ajoute un terme négligeable pour mettre en premiers les cases les plus proches du centre
@@ -64,7 +69,7 @@ class Segmentation:
         res = cell + self.neighbours[dist]
         
         # filtre les voisins qui sortent du tableau
-        return [v for v in res if np.all((0 <= v) & (v < self.n_step))]
+        return res[np.all((0 <= res) & (res < self.n_step), axis=1)]
     
     def gen_matrix(self):
         """retourne un tableau 3D servant à stocker les points"""
@@ -73,11 +78,11 @@ class Segmentation:
     
     def get_mat_coo(self, point):
         """retourne les coordonnées de la case du tableau contenant ce point"""
-        res = [int((coo + 1) * self.n_step_2) for coo in point]
+        res = np.asarray((point + 1) * self.n_step_2, int)
         #<=> int((coo - self.coo_min) / (self.coo_max - self.coo_min) * self.n_step)
         
         # si une coordonnée est maximale (càd 1), le point sort du tableau, on le met dans la case d'avant
-        return [min(x, self.n_step - 1) for x in res]
+        return np.minimum(res, self.n_step - 1)
     
     def get_float_coo(self, point):
         """retourne les coordonnées de notre point dans la base des cases du tableau"""
@@ -104,13 +109,12 @@ class Nuage:
     def recreate(self, points):
         """vide et re-rempli l'ancien tableau plutôt que de le supprimer et d'en allouer un nouveau"""
         self.liste_points = points
-        
         # vide
         self.segmentation.filler(self.mat, self.mat)
         
         # remplit
         for p in self.liste_points:
-            x, y, z = self.segmentation.get_mat_coo(p)
+            x, y, z = self.segmentation.get_mat_coo(p.detach())
             self.mat[x, y, z].append(p)
         
         return self
@@ -121,7 +125,7 @@ class Nuage:
     
     def get_closest(self, point):
         # calcule la case dans laquelle tomberait le point
-        case_coo = self.segmentation.get_mat_coo(point)
+        case_coo = self.segmentation.get_mat_coo(point.detach().numpy())
         
         # le point le plus proche ne se trouve pas forcément dans la case la plus proche
         # un point plus proche peut encore être trouvé dans une case plus lointaine tant que
@@ -137,22 +141,36 @@ class Nuage:
             
             # considère toutes les cases non vides à distance d de notre case
             neighbours = [v for v in self.segmentation.get_neighbours(case_coo, d_2) if self.mat[v[0], v[1], v[2]]]
+            if not len(neighbours): continue
+            neighbours = np.array(neighbours)
             
-            # calcule la distance entre notre point et le sommet de la case le plus proche
-            precise_dist_2 = [(np.sum(np.power(point_coo - v, 2)), v) for v in neighbours]
+            # calcule la distance entre notre point et le point des cases le plus proche
+            cell_diff = point_coo - neighbours
+            # on peut se déplacer dans la case en rajoutant un nombre compris entre 0 et 1
+            cell_diff = cell_diff + np.minimum(1, np.maximum(0, cell_diff))
+            cell_diff = np.sum(np.power(cell_diff, 2), axis=1)
+            # passe d'une distance entre cases à une distance entre point
+            cell_diff = cell_diff * self.segmentation.factor_2
             
             # enlève les cases dont la distance min est trop grande
-            precise_dist_2 = [(d_2, v) for (d_2, v) in precise_dist_2 if d_2 < closest_point]
+            ind_kept = np.where(cell_diff < closest_point.item())
+            if not len(ind_kept): continue
+            cell_diff = cell_diff[ind_kept]
+            neighbours = neighbours[ind_kept]
             
-            # parcourt les cases par ordre croissant (pour réduire l'espérance de temps pour trouver le point le plus proche)
-            for real_d_2, v in sorted(precise_dist_2, key=lambda x: x[0]):
+            # tri les cases par ordre croissant de distance
+            ind_sorted = np.argsort(cell_diff)
+            cell_diff = cell_diff[ind_sorted]
+            neighbours = neighbours[ind_sorted]
+            
+            for real_d_2, v in zip(cell_diff, neighbours):
                 if real_d_2 > closest_point:
                     break
                     
                 cpt_point_parcourus += len(self.mat[v[0], v[1], v[2]])
                 
                 # regarde si le point le plus proche parmi tous les points de la case est mieux
-                candidat = torch.min(torch.cat([torch.sum(torch.pow(point - p, 2), dim=(0,)).unsqueeze(0) for p in self.mat[v[0], v[1], v[2]]]))
+                candidat = torch.min(torch.cat([torch.sum(torch.pow(point - p, 2)).unsqueeze(0) for p in self.mat[v[0], v[1], v[2]]]))
                 if candidat < closest_point:
                     closest_point = candidat
             else:
@@ -164,13 +182,17 @@ class Nuage:
         return closest_point
     
     def chamfer(self, other):
+        # les points doivent bien être atteint par un MLP
         loss0 = torch.sum(torch.cat([self.get_closest(p).unsqueeze(0) for p in other.liste_points]))
+        
+        # les MLP doivent bien atteindre un point
         loss1 = torch.sum(torch.cat([other.get_closest(p).unsqueeze(0) for p in self.liste_points]))
+        
         return loss0, loss1
 
 
 class Reconstructeur(nn.Module):
-    def __init__(self, n_mlp, latent_size, n_grid_step, segmentation):
+    def __init__(self, n_mlp, latent_size, n_grid_step, segmentation, quadratic):
         super().__init__()
         print("nombre de MLP:", n_mlp)
         print("résolution de la grille:", n_grid_step, "^2 =", n_grid_step ** 2)
@@ -181,23 +203,34 @@ class Reconstructeur(nn.Module):
         self.output_dim = 3
         self.n_grid_step = n_grid_step
         self.verbose = True
+        self.n_mlp = n_mlp
+
+        s = [128, 64]
+        # s = [512, 256, 128]
+        self.sizes = s
         
+        # cf forward
+        self.f0_a = nn.ModuleList([nn.Linear(latent_size, s[0]) for _ in range(n_mlp)])
+        self.f0_b = nn.ModuleList([nn.Linear(self.input_dim, s[0]) for _ in range(n_mlp)])
+
         self.decodeurs = nn.ModuleList([nn.Sequential(
-            #on rajoute les coordonnées d'un point dans l'espace de départ
-            nn.Linear(latent_size + self.input_dim, 512),
             nn.ReLU(),
-            nn.Linear(512, 256),
+    
+            nn.Linear(s[0], s[1]),
             nn.ReLU(),
-            nn.Linear(256, 128),
-            nn.ReLU(),
+    
+            # nn.Linear(s[1], s[2]),
+            # nn.ReLU(),
+    
             #on retourne un point dans l'espace de sortie
-            nn.Linear(128, self.output_dim),
+            nn.Linear(s[-1], self.output_dim),
             #tanh ramène dans [-1, 1], comme les nuages de notre auto-encodeur et de groueix
             nn.Tanh()
         ) for _ in range(n_mlp)])
         
         self.grid = self._gen_grid()
-        self.loss = Nuage.chamfer
+        
+        self.loss = Reconstructeur.chamfer if quadratic else Nuage.chamfer
     
     def _gen_grid(self):
         """retourne une liste de n points 2D au bon format :
@@ -214,59 +247,25 @@ class Reconstructeur(nn.Module):
         
         return np.vectorize(f, otypes=[object])(*points_dim).reshape(-1)
     
-    def forward(self, x):
-        # concatenation de x et p pour tous les points de la grille
-        grid_x = [torch.cat((x, p)) for p in self.grid]
+    def forward(self, x0):
+        # partie indépendante du sampling :
+        y0_a = torch.cat([f(x0) for f in self.f0_a])
+        y0_a = y0_a.reshape((self.n_mlp, 1, -1))
         
-        # f(x_p) pour tout x_p pour tout mlp
-        return self._nuage_tmp.recreate(np.array([[f(x_p) for x_p in grid_x] for f in self.decodeurs]).reshape(-1))
+        # calcul pour tout f pour tout p
+        y0_b = torch.cat([torch.cat([f(p) for p in self.grid]) for f in self.f0_b])
+        y0_b = y0_b.reshape((self.n_mlp, len(self.grid), -1))
+        
+        # combine somme
+        y0 = torch.add(y0_a, y0_b)
+        
+        # le reste
+        res = torch.cat([torch.cat([f(x) for x in e]) for f, e in zip(self.decodeurs, y0)])
+        res = res.reshape((self.n_mlp * len(self.grid), self.output_dim))
+        if self.loss == Nuage.chamfer:
+            res = self._nuage_tmp.recreate(res)
+        return res
 
-
-class Reconstructeur2(nn.Module):
-    """chamfer quadratique, à supprimer"""
-    def __init__(self, n_mlp, latent_size, n_grid_step):
-        super().__init__()
-        print("nombre de MLP:", n_mlp)
-        print("résolution de la grille:", n_grid_step, "*", n_grid_step, "=", n_grid_step ** 2)
-        print("taille des nuages générés:", n_mlp, "*", n_grid_step ** 2, "=", n_mlp * n_grid_step ** 2, )
-        self.input_dim = 2
-        self.output_dim = 3
-        self.n_grid_step = n_grid_step
-        self.verbose = True
-        
-        self.decodeurs = nn.ModuleList([nn.Sequential(
-            #on rajoute les coordonnées d'un point dans l'espace de départ
-            nn.Linear(latent_size + self.input_dim, 512),
-            nn.ReLU(),
-            nn.Linear(512, 256),
-            nn.ReLU(),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            #on retourne un point dans l'espace de sortie
-            nn.Linear(128, self.output_dim),
-            #tanh ramène dans [-1, 1], comme les nuages de notre auto-encodeur et de groueix
-            nn.Tanh()
-        ) for _ in range(n_mlp)])
-        
-        self.decodeurs = nn.ModuleList([nn.Sequential(
-            nn.Linear(latent_size + self.input_dim, self.output_dim),
-            nn.Tanh()
-        ) for _ in range(n_mlp)])
-        
-        self.grid = self._gen_grid()
-        self.loss = self.chamfer
-    
-    def _gen_grid(self):
-        points_dim = [np.linspace(0, 1, self.n_grid_step) for _ in range(self.input_dim)]
-        points_dim = np.meshgrid(*points_dim)
-        
-        def f(*point_dim):
-            v = torch.tensor(list(point_dim)).float()
-            v.requires_grad = False
-            return v
-        
-        return np.vectorize(f, otypes=[object])(*points_dim).reshape(-1)
-    
     @staticmethod
     def chamfer(Y, S):
         """return chamfer loss between
@@ -276,42 +275,23 @@ class Reconstructeur2(nn.Module):
         sum_F(sum_A) et min_A(min_F) correspondent à une simple somme ou min sur l'ensemble des données
         donc on représente l'ensemble des points générés Y comme une liste et non comme une matrice
         """
+        normes = torch.cat([torch.cat([torch.sum(torch.pow(y - s, 2)).unsqueeze(0) for s in S]) for y in Y])
+        normes = normes.reshape((len(S), len(Y)))
+        loss0 = torch.sum(torch.min(normes, dim=0)[0])
+        loss1 = torch.sum(torch.min(normes, dim=1)[0])
+        return loss0, loss1
     
-        # Pas la même taille :
-        # normes = torch.pow(torch.norm(Y - S), 2)
-    
-        # normes = np.array([[torch.norm(y - s) for s in S] for y in Y])
-        normes = np.array([[torch.sum(torch.pow(y - s, 2), dim=(0,)) for s in S] for y in Y])
-        loss1 = np.sum(np.min(normes, axis=0))
-        loss2 = np.sum(np.min(normes, axis=1))
-        return loss1, loss2
-    
-        # On sert uniquement des min selon les deux axes, on peut ne pas stocker la matrice pour éviter les problèmes de RAM
-        # listes des minimums sur chaque ligne et colonne
-        min_axe0 = [torch.tensor(float("+inf"))] * len(S)
-        min_axe1 = [torch.tensor(float("+inf"))] * len(Y)
-    
-        # pour chaque case de la matrice, met à jour les deux minimums correspondants
-        for i, s in enumerate(S):
-            for j, y in enumerate(Y):
-                val = torch.norm(y - s)
-                min_axe0[i] = torch.min(val, min_axe0[i])
-                min_axe1[j] = torch.min(val, min_axe1[j])
-    
-        # les Q doivent bien être atteint par un MLP
-        loss1 = sum(min_axe0)
-    
-        # les MLP doivent bien atteindre un Q
-        loss2 = sum(min_axe1)
-    
-        return loss1, loss2
-
-    def forward(self, x):
-        # concatenation de x et p pour tous les points de la grille
-        grid_x = [torch.cat((x, p)) for p in self.grid]
-        
-        # f(x_p) pour tout x_p pour tout mlp
-        return np.array([[f(x_p) for x_p in grid_x] for f in self.decodeurs]).reshape(-1)
+        # # On sert uniquement des min selon les deux axes, on peut ne pas stocker la matrice pour éviter les problèmes de RAM
+        # # listes des minimums sur chaque ligne et colonne
+        # min_axe0 = [torch.tensor(float("+inf"))] * len(S)
+        # min_axe1 = [torch.tensor(float("+inf"))] * len(Y)
+        # # pour chaque case de la matrice, met à jour les deux minimums correspondants
+        # for i, s in enumerate(S):
+        #     for j, y in enumerate(Y):
+        #         val = torch.norm(y - s)
+        #         min_axe0[i] = torch.min(val, min_axe0[i])
+        #         min_axe1[j] = torch.min(val, min_axe1[j])
+        # return torch.sum(min_axe0), torch.sum(min_axe1)
 
 
 def fit_reconstructeur(reconstructeur, x_train, y_train, x_test, y_test, epochs, lr=1e-5, grid_scale=1.0):
@@ -320,25 +300,25 @@ def fit_reconstructeur(reconstructeur, x_train, y_train, x_test, y_test, epochs,
         prendre un carré 100*100 revient à augmenter les coefficients du premier Linear sans pénaliser le modèle
     """
     reconstructeur.grid *= grid_scale
-    optimizer = torch.optim.Adam(reconstructeur.parameters(), lr=lr)
+    optimizer = torch.optim.Adagrad(reconstructeur.parameters(), lr=lr, lr_decay=0.05)
     loss_train = None
     
     time_loss = np.zeros(epochs)
-    time_tot = np.zeros(epochs)
+    time_tot = []
+    list_loss = []
     
     for epoch in range(epochs):
         loss_train = 0
         t_tot = time.time()
         for x, y in zip(x_train, y_train):
             assert not x.requires_grad
-            
             y_pred = reconstructeur.forward(x)
             
             t_loss = time.time()
             loss = reconstructeur.loss(y_pred, y)
             time_loss[epoch] += time.time() - t_loss
             
-            # print(loss)
+            print("loss", loss)
             loss = loss[0] + loss[1]
             loss_train += loss.item() / len(x_train)
             
@@ -346,7 +326,8 @@ def fit_reconstructeur(reconstructeur, x_train, y_train, x_test, y_test, epochs,
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-        time_tot[epoch] += time.time() - t_tot
+        time_tot.append(time.time() - t_tot)
+        list_loss.append(loss_train)
         
         if reconstructeur.verbose and (epochs < 10 or epoch % (epochs // 10) == 0):
             reconstructeur.eval()
@@ -364,7 +345,7 @@ def fit_reconstructeur(reconstructeur, x_train, y_train, x_test, y_test, epochs,
     
     #apprentissage fini, passage en mode évaluation
     reconstructeur.eval()
-    return loss_train, time_loss, time_tot
+    return list_loss, time_loss, time_tot
 
 
 def draw_cloud(ax, c):
@@ -381,13 +362,12 @@ def plot_tailles(clouds):
 def _main():
     chosen_subset = [0]
     n_per_cat = 1
-    clouds2 = tSNE.get_clouds(chosen_subset, n_per_cat, ratio=.01)
+    clouds2 = tSNE.get_clouds(chosen_subset, n_per_cat, ratio=.001)
     print("taille des nuages ground truth:", len(clouds2[0]))
     latent = tSNE.get_latent(chosen_subset, n_per_cat,
                              nPerObj=1)  # /!\ attention: il faut que les fichiers sur le disque correspondent
     
     segmentation = Segmentation(5)
-    
     clouds = [Nuage(x, segmentation) for x in clouds2]
     
     # plot_tailles(clouds)
@@ -405,41 +385,43 @@ def _main():
     train_y2 = [clouds2[i] for i in indexes[:n_train]]
     test_y2 = [clouds2[i] for i in indexes[n_train:]]
     
-    n_mlp = 10
+    n_mlp = 5
     latent_size = 25088  # défini par l'encodeur utilisé
-    grid_points = 8
+    grid_points = 4
     epochs = 5
     grid_size = 1e0
     lr = 1e-4
     
-    reconstructeur = Reconstructeur(n_mlp, latent_size, grid_points, segmentation)
+    torch.manual_seed(0)
+    np.random.seed(0)
+    reconstructeur1 = Reconstructeur(n_mlp, latent_size, grid_points, segmentation, quadratic=False)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    reconstructeur2 = Reconstructeur(n_mlp, latent_size, grid_points, segmentation, quadratic=True)
+    assert np.all(reconstructeur1.f0_a._modules['0'].weight.detach().numpy() ==
+                  reconstructeur2.f0_a._modules['0'].weight.detach().numpy())
+    assert np.all(clouds[0].liste_points.detach().numpy()==clouds2[0].detach().numpy())
     
-    t = time.time()
-    for _ in range(1):
-        loss, t_loss, t_tot = fit_reconstructeur(reconstructeur, train_x, train_y, test_x, test_y, epochs, lr=lr, grid_scale=grid_size)
+    for reconstructeur, param in zip([reconstructeur1, reconstructeur2], [train_y, train_y2]):
+    # for reconstructeur, param in zip([reconstructeur1], [train_y]):
+    # for reconstructeur, param in zip([reconstructeur2], [train_y2]):
+        loss, t_loss, t_tot = fit_reconstructeur(reconstructeur, train_x, param, test_x, test_y, epochs, lr=lr, grid_scale=grid_size)
+        plt.plot(loss[1:])
+        plt.show()
         print("\ntemps: ")
         print("loss", sum(t_loss), t_loss)
         print("tot", sum(t_tot), t_tot)
         print("ratio", sum(t_loss)/sum(t_tot), t_loss/t_tot)
-    print("O(n)", time.time() - t)
     
-    print("répartition point parcourus")
+    print("répartition point parcourus histogramme :")
     print(np.histogram(Nuage.points_parcourus))
-    print(np.mean(Nuage.points_parcourus))
+    print("moyenne", np.mean(Nuage.points_parcourus), "points parcourus")
     # print(segmentation.distances_2)
     
-    output = reconstructeur.forward(latent[0])
+    output = reconstructeur1.forward(latent[0])
     output = [p.detach().numpy() for p in output.liste_points]
-    tSNE.write_clouds("./data/output_clouds", [output])
+    tSNE.write_clouds("../data/output_clouds", [output])
     
-    exit()
-    print("reconstructeur O(n2) : ")
-    reconstructeur2 = Reconstructeur2(n_mlp, latent_size, grid_points)
-    t = time.time()
-    for _ in range(1):
-        fit_reconstructeur(reconstructeur2, train_x, train_y2, test_x, test_y2, epochs, lr=lr, grid_scale=grid_size)
-    print("O(n2)", time.time() - t)  #
-
 
 if __name__ == '__main__':
     _main()
