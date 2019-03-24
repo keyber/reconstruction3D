@@ -20,13 +20,12 @@ rm_other = params.rm_other
 print("Cet outil supprime des images et des nuages de points pour ne garder que ceux souhaités")
 print(vars(params))
 
-ply = "../AtlasNet/data/customShapeNet"
-#png = "../AtlasNet/data/ShapeNetRendering2"
-rm_other = 1
-#intersect = 1
-per_cat = 500
-per_obj = 10
-
+# ply = "../AtlasNet/data/customShapeNet"
+# #png = "../AtlasNet/data/ShapeNetRendering2"
+# rm_other = 1
+# #intersect = 1
+# per_cat = 500
+# per_obj = 10
 
 if not ply and not png:
     raise ValueError("pour faire quelque chose il faut au moins un dossier")

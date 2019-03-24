@@ -131,9 +131,9 @@ def _get_categories(path, chosenSubSet):
 
 
 def get_latent(chosenSubSet, nPerCat, nPerObj):
-    id_category = _get_categories("../AtlasNet/data/ShapeNetRendering/", chosenSubSet)
-    root = "../AtlasNet/data/ShapeNetRendering"
-    local_path = "./data/latentVectors"
+    id_category = _get_categories("../../AtlasNet/data/ShapeNetRendering/", chosenSubSet)
+    root = "../../AtlasNet/data/ShapeNetRendering"
+    local_path = "../data/latentVectors"
     
     try:
         #chargement des vecteurs latents
@@ -169,7 +169,7 @@ def get_latent(chosenSubSet, nPerCat, nPerObj):
 
 def get_clouds(chosenSubSet, nPerCat, ratio):
     assert 0 < ratio <= 1
-    path = "../AtlasNet/data/customShapeNet"
+    path = "../../AtlasNet/data/customShapeNet"
     id_category = _get_categories(path, chosenSubSet)
     return _gen_clouds(path, id_category, nPerCat, ratio)
 
@@ -200,7 +200,7 @@ def genModel():
 def _test():
     vgg = models.vgg16(pretrained=True)
     #récupère une image
-    im = _gen_latent("../AtlasNet/data/ShapeNetRendering/", ["02691156"], 1, 1)[0]
+    im = _gen_latent("../../AtlasNet/data/ShapeNetRendering/", ["02691156"], 1, 1)[0]
     l = list(vgg.features.children()) + list(vgg.classifier.children())
     
     print("taille des couches")

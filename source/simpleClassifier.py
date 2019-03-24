@@ -5,7 +5,7 @@ import numpy as np
 
 class SimpleClassifier(torch.nn.Module):
     def __init__(self, D_in, D_out):
-        super(simpleClassifier, self).__init__()
+        super().__init__()
         self.linear = torch.nn.Linear(D_in, D_out)
         #self.linear = torch.nn.Sequential(torch.nn.Linear(D_in, D_out, bias=True),)
         #self.logprob = torch.nn.LogSoftmax(dim=1)

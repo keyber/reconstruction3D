@@ -15,10 +15,11 @@ class Segmentation:
         self.coo_max = 1
         self.n_step = n_step
         self.n_step_2 = n_step / 2
-        
+
+        # facteur pour passer de distances entre cases à des distances entre points
+        self.factor_2 = ((self.coo_max - self.coo_min) / self.n_step) ** 2
+
         self.neighbours, self.distances_2 = self._gen_neighbours()
-        # for d in self.distances_2:
-        #     print(d,":",self.neighbours[d])
         
         # sert à initialiser la matrice
         self.filler = np.frompyfunc(lambda x: list(), 1, 1)
@@ -26,13 +27,10 @@ class Segmentation:
     def _gen_neighbours(self):
         # génère tous les déplacements possibles de -n à n dans chaque dim
         r = range(self.n_step * 2)
-        list_neighbours = np.array([[[(i, j, k) for i in r] for j in r] for k in r])
+        list_neighbours = np.array([[[(i, j, k) for i in r] for j in r] for k in r]).reshape(-1, 3)
         
         # shift de n pour centrer
-        list_neighbours = [voisin - self.n_step for voisin in list_neighbours.reshape(-1, 3)]
-        
-        # facteur pour passer de distances entre cases (coordonnées entières) à des distances entre points
-        factor_2 = ((self.coo_max - self.coo_min) / self.n_step) ** 2
+        list_neighbours = list_neighbours - self.n_step
         
         # trie par distance au centre
         # il y a bcp d'équivalents
@@ -42,11 +40,11 @@ class Segmentation:
             # la distance minimale entre des points des deux cases est égale à
             # la norme du vecteur entre les cases auquel on ENLEVE 1 DANS TOUTES LES DIMENSIONS NON NULLES
             # on laisse tout au carré
-            d2 = np.sum(np.power(np.maximum(np.abs(voisin) - 1, 0), 2)) * factor_2
+            d2 = np.sum(np.power(np.maximum(np.abs(voisin) - 1, 0), 2)) * self.factor_2
             
             # une dimension égale à 1 devient équivalente à une dimension nulle
             # on ajoute un terme négligeable pour mettre en premiers les cases les plus proches du centre
-            d2 += (np.abs(voisin) == 1).sum() * 1e-6
+            d2 += np.sum(np.abs(voisin) == 1) * 1e-6
             
             if d2 not in dict_neighbours:  # pas de pb d'arrrondi car on travaille sur des entiers, puis effectue les mêmes opérations
                 dict_neighbours[d2] = []

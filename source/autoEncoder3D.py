@@ -233,7 +233,7 @@ def _main_plot_cross_validation(clouds, n_points, space_dim, n_cross_validation)
 
 def _main_clustering(clouds, n_classes, n_points, space_dim):
     latent_size = 2
-    epochs = 500
+    epochs = 20
     model = AutoEncoder3D(n_points, space_dim, latent_size, epochs)
     model.verbose = True
     n = int(.8*len(clouds))
@@ -285,7 +285,7 @@ def _main():
     
     _main_fit_forward_draw(clouds, (n_points, space_dim, 2, 50), 400*len(cloud_generator))
 
-    # _main_plot_cross_validation(clouds, n_points, space_dim, n_cross_validation)
+    _main_plot_cross_validation(clouds, n_points, space_dim, n_cross_validation)
 
 if __name__ == '__main__':
     _main()

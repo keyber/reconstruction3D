@@ -6,7 +6,7 @@ from PIL import Image
 def loadLabels():
     import os
     import numpy as np
-    path = "./data/labels"
+    path = "../data/labels"
     file = path + ".npy"
     if os.path.isfile(file):
         return np.load(file).item()
@@ -57,7 +57,7 @@ def top(arr, n=5):
 
 def _main():
     import sys
-    img = sys.argv[1] if len(sys.argv) >= 2 else "../AtlasNet/data/plane_input_demo.png"
+    img = sys.argv[1] if len(sys.argv) >= 2 else "../../AtlasNet/data/plane_input_demo.png"
     print("fichier: " + img)
     
     print("chargement modèle")
