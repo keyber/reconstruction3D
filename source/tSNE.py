@@ -78,7 +78,7 @@ def _gen_clouds(root, id_category, nPerCat, ratio_sous_echantillonage):
                     if len(sub_sampled) < ratio_sous_echantillonage * (i+1):
                         sub_sampled.append(torch.tensor(x))
                         
-                res.append(sub_sampled)
+                res.append(torch.cat(sub_sampled).reshape((-1, 3)))
                 
                 cpt += 1
                 if cpt == nPerCat:
