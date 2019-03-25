@@ -302,7 +302,6 @@ def fit_reconstructeur(reconstructeur, x_train, y_train, x_test, y_test, epochs,
     """
     reconstructeur.grid *= grid_scale
     optimizer = torch.optim.Adagrad(reconstructeur.parameters(), lr=lr, lr_decay=0.05)
-    loss_train = None
     
     time_loss = np.zeros(epochs)
     time_tot = []
