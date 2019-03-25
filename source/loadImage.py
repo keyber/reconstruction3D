@@ -1,4 +1,3 @@
-import torch
 import torchvision.models as models
 import torchvision.transforms as transforms
 from PIL import Image
@@ -26,9 +25,8 @@ def loadImage(path):
     img = Image.open(path)
     
     # We need to:
-    #       * resize the img, it is pretty big (~1200x1200px).
+    #       * resize the img
     #       * normalize it, as noted in the PyTorch pretrained models doc,
-    #         with, mean = [0.485, 0.456, 0.406] and std = [0.229, 0.224, 0.225].
     #       * convert it to a PyTorch Tensor.
     # We can do all this preprocessing using a transform pipeline.
     img_size = 224  # The min size, as noted in the PyTorch pretrained models doc, is 224 px.
@@ -37,17 +35,12 @@ def loadImage(path):
                                              transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                                   std=[0.229, 0.224, 0.225])])
     
-    img = transform_pipeline(img)
+    img = transform_pipeline(img.convert('RGB'))
     
     # PyTorch pretrained models expect the Tensor dims to be (num input imgs, num color channels, height, width).
     # Currently however, we have (num color channels, height, width); let's fix this by inserting a new axis.
-    #img = img.unsqueeze(0)  # Insert the new axis at index 0 i.e. in front of the other axes/dims.
-    img = img[:3, :, :].unsqueeze(0)  #enlève le channel alpha
     
-    # Now that we have preprocessed our img, we need to convert it into a
-    # Variable; PyTorch models expect inputs to be Variables. A PyTorch Variable is a
-    # wrapper around a PyTorch Tensor.
-    return torch.tensor(img)
+    return img.unsqueeze(0)
 
 
 def top(arr, n=5):

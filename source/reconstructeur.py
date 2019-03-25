@@ -15,10 +15,10 @@ class Segmentation:
         self.coo_min = -1
         self.coo_max = 1
         self.n_step = n_step
-        self.n_step_2 = n_step / 2
+        self.n_step_div2 = n_step / 2
 
         # facteur pour passer de distances entre cases à des distances entre points
-        self.factor_2 = ((self.coo_max - self.coo_min) / self.n_step) ** 2
+        self.factor_2 = (1 / self.n_step) ** 2
         
         # ensemble des déplacements(/voisins) possibles, ordonnés par leur distances
         self.neighbours, self.distances_2 = self._gen_neighbours()
@@ -42,7 +42,7 @@ class Segmentation:
             # la distance minimale entre des points des deux cases est égale à
             # la norme du vecteur entre les cases auquel on ENLEVE 1 DANS TOUTES LES DIMENSIONS NON NULLES
             # on laisse tout au carré
-            d2 = np.sum(np.power(np.maximum(np.abs(voisin) - 1, 0), 2))
+            d2 = np.sum(np.square(np.maximum(np.abs(voisin) - 1, 0)))
             
             # convertit la distance entre cases en une distance entre point
             d2 *= self.factor_2
@@ -78,7 +78,7 @@ class Segmentation:
     
     def get_mat_coo(self, point):
         """retourne les coordonnées de la case du tableau contenant ce point"""
-        res = np.asarray((point + 1) * self.n_step_2, int)
+        res = np.asarray((point + 1) * self.n_step_div2, int)
         #<=> int((coo - self.coo_min) / (self.coo_max - self.coo_min) * self.n_step)
         
         # si une coordonnée est maximale (càd 1), le point sort du tableau, on le met dans la case d'avant
@@ -86,7 +86,7 @@ class Segmentation:
     
     def get_float_coo(self, point):
         """retourne les coordonnées de notre point dans la base des cases du tableau"""
-        return np.minimum((point + 1) * self.n_step_2, self.n_step - 1)
+        return np.minimum((point + 1) * self.n_step_div2, self.n_step - 1)
 
 
 class Nuage:
@@ -109,6 +109,7 @@ class Nuage:
     def recreate(self, points):
         """vide et re-rempli l'ancien tableau plutôt que de le supprimer et d'en allouer un nouveau"""
         self.liste_points = points
+        
         # vide
         self.segmentation.filler(self.mat, self.mat)
         
@@ -147,13 +148,13 @@ class Nuage:
             # calcule la distance entre notre point et le point des cases le plus proche
             cell_diff = point_coo - neighbours
             # on peut se déplacer dans la case en rajoutant un nombre compris entre 0 et 1
-            cell_diff = cell_diff + np.minimum(1, np.maximum(0, cell_diff))
-            cell_diff = np.sum(np.power(cell_diff, 2), axis=1)
+            cell_diff = cell_diff - np.minimum(1, np.maximum(0, cell_diff))
+            cell_diff = np.sum(np.square(cell_diff), axis=1)
             # passe d'une distance entre cases à une distance entre point
             cell_diff = cell_diff * self.segmentation.factor_2
             
             # enlève les cases dont la distance min est trop grande
-            ind_kept = np.where(cell_diff < closest_point.item())
+            ind_kept = np.where(cell_diff <= closest_point.item())
             if not len(ind_kept): continue
             cell_diff = cell_diff[ind_kept]
             neighbours = neighbours[ind_kept]
@@ -276,7 +277,7 @@ class Reconstructeur(nn.Module):
         donc on représente l'ensemble des points générés Y comme une liste et non comme une matrice
         """
         normes = torch.cat([torch.cat([torch.sum(torch.pow(y - s, 2)).unsqueeze(0) for s in S]) for y in Y])
-        normes = normes.reshape((len(S), len(Y)))
+        normes = normes.reshape((len(Y), len(S)))
         loss0 = torch.sum(torch.min(normes, dim=0)[0])
         loss1 = torch.sum(torch.min(normes, dim=1)[0])
         return loss0, loss1
@@ -318,7 +319,7 @@ def fit_reconstructeur(reconstructeur, x_train, y_train, x_test, y_test, epochs,
             loss = reconstructeur.loss(y_pred, y)
             time_loss[epoch] += time.time() - t_loss
             
-            print("loss", loss)
+            # print("loss", loss)
             loss = loss[0] + loss[1]
             loss_train += loss.item() / len(x_train)
             
@@ -388,15 +389,13 @@ def _main():
     n_mlp = 5
     latent_size = 25088  # défini par l'encodeur utilisé
     grid_points = 4
-    epochs = 5
+    epochs = 1
     grid_size = 1e0
     lr = 1e-4
     
-    torch.manual_seed(0)
-    np.random.seed(0)
+    torch.manual_seed(0); np.random.seed(0)
     reconstructeur1 = Reconstructeur(n_mlp, latent_size, grid_points, segmentation, quadratic=False)
-    np.random.seed(0)
-    torch.manual_seed(0)
+    torch.manual_seed(0); np.random.seed(0)
     reconstructeur2 = Reconstructeur(n_mlp, latent_size, grid_points, segmentation, quadratic=True)
     assert np.all(reconstructeur1.f0_a._modules['0'].weight.detach().numpy() ==
                   reconstructeur2.f0_a._modules['0'].weight.detach().numpy())
@@ -405,6 +404,7 @@ def _main():
     for reconstructeur, param in zip([reconstructeur1, reconstructeur2], [train_y, train_y2]):
     # for reconstructeur, param in zip([reconstructeur1], [train_y]):
     # for reconstructeur, param in zip([reconstructeur2], [train_y2]):
+        torch.manual_seed(0); np.random.seed(0)
         loss, t_loss, t_tot = fit_reconstructeur(reconstructeur, train_x, param, test_x, test_y, epochs, lr=lr, grid_scale=grid_size)
         plt.plot(loss[1:])
         plt.show()
@@ -421,11 +421,34 @@ def _main():
     output = reconstructeur1.forward(latent[0])
     output = [p.detach().numpy() for p in output.liste_points]
     tSNE.write_clouds("../data/output_clouds", [output])
+
+
+def _test():
+    s = Segmentation(5)
+    c1 = Nuage(tSNE.get_clouds([0], 1, ratio=.01)[0], s)
+    c2 = torch.tensor([[0., 0, 0], [1, 1, 1], [-1, -1, -1], [.2,.3,.0]])
+    c2 = Nuage(c2, s)
+    n_mlp = 2; latent_size = 25088; grid_points = 4; epochs = 5; lr = 1e-4
+    latent = tSNE.get_latent([0], 1, nPerObj=1)[0]
     
+    # équivalence des deux fonctions de loss
+    assert Nuage.chamfer(c1, c2) == Reconstructeur.chamfer(c1.liste_points, c2.liste_points)
+
+    
+    torch.manual_seed(0); np.random.seed(0)
+    reconstructeur1 = Reconstructeur(n_mlp, latent_size, grid_points, s, quadratic=False)
+    torch.manual_seed(0); np.random.seed(0)
+    reconstructeur2 = Reconstructeur(n_mlp, latent_size, grid_points, s, quadratic=True)
+
+    loss1, t_loss1, t_tot1 = fit_reconstructeur(reconstructeur1, [latent], [c1], [], [], epochs, lr=lr)
+    loss2, t_loss2, t_tot2 = fit_reconstructeur(reconstructeur2, [latent], [c1.liste_points], [], [], epochs, lr=lr)
+    print(loss1)
+    print(loss2)
+    assert np.all(np.abs(np.array(loss1) - np.array(loss2)) < 1e-1)
 
 if __name__ == '__main__':
+    _test()
     _main()
-
 
 # torch.save(the_model.state_dict(), PATH)
 # the_model = TheModelClass(*args, **kwargs)

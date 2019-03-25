@@ -47,7 +47,7 @@ def _gen_latent(root, id_category, nPerCat, nPerObj):
     res = []
     for cat in id_category:
         path = root + str(cat) + "/"
-        for key in os.listdir(path)[:nPerCat]:
+        for key in sorted(os.listdir(path))[:nPerCat]:
             sub_path = path + key + "/rendering/"
             
             with open(sub_path + "renderings.txt") as f:
@@ -67,7 +67,7 @@ def _gen_clouds(root, id_category, nPerCat, ratio_sous_echantillonage):
     for cat in id_category:
         path = root + str(cat) + "/ply/"
         cpt = 0
-        for key in os.listdir(path):
+        for key in sorted(os.listdir(path)):
             #ignore les fichiers .txt
             if key[-4:] != ".txt":
                 sub_path = path + key
@@ -131,8 +131,8 @@ def _get_categories(path, chosenSubSet):
 
 
 def get_latent(chosenSubSet, nPerCat, nPerObj):
-    id_category = _get_categories("../../AtlasNet/data/ShapeNetRendering/", chosenSubSet)
-    root = "../../AtlasNet/data/ShapeNetRendering"
+    root = "../../AtlasNet/data/ShapeNetRendering/"
+    id_category = _get_categories(root, chosenSubSet)
     local_path = "../data/latentVectors"
     
     try:
@@ -218,9 +218,9 @@ def _test():
 def _main():
     #_test()
 
-    chosenSubSet = [0, 2, 7]
+    chosenSubSet = [0, 1]
     n = len(chosenSubSet)
-    nPerClass = 100
+    nPerClass = 10
     nPerObj = 1
     latentCat = get_latent(chosenSubSet, nPerClass, nPerObj)
     
