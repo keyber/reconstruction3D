@@ -392,13 +392,8 @@ def _main():
     grid_size = 1e0
     lr = 1e-4
     
-    torch.manual_seed(0); np.random.seed(0)
     reconstructeur1 = Reconstructeur(n_mlp, latent_size, grid_points, segmentation, quadratic=False)
-    torch.manual_seed(0); np.random.seed(0)
     reconstructeur2 = Reconstructeur(n_mlp, latent_size, grid_points, segmentation, quadratic=True)
-    assert np.all(reconstructeur1.f0_a._modules['0'].weight.detach().numpy() ==
-                  reconstructeur2.f0_a._modules['0'].weight.detach().numpy())
-    assert np.all(clouds[0].liste_points.detach().numpy()==clouds2[0].detach().numpy())
     
     for reconstructeur, param in zip([reconstructeur1, reconstructeur2], [train_y, train_y2]):
     # for reconstructeur, param in zip([reconstructeur1], [train_y]):
