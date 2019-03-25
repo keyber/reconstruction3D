@@ -398,7 +398,6 @@ def _main():
     for reconstructeur, param in zip([reconstructeur1, reconstructeur2], [train_y, train_y2]):
     # for reconstructeur, param in zip([reconstructeur1], [train_y]):
     # for reconstructeur, param in zip([reconstructeur2], [train_y2]):
-        torch.manual_seed(0); np.random.seed(0)
         loss, t_loss, t_tot = fit_reconstructeur(reconstructeur, train_x, param, test_x, test_y, epochs, lr=lr, grid_scale=grid_size)
         plt.plot(loss[1:])
         plt.show()
