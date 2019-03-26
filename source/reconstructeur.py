@@ -16,7 +16,7 @@ class Segmentation:
         self.coo_max = 1
         self.n_step = n_step
         self.n_step_div2 = n_step / 2
-
+        
         # facteur pour passer de distances entre cases à des distances entre points
         self.factor_2 = (1 / self.n_step) ** 2
         
@@ -24,7 +24,7 @@ class Segmentation:
         self.neighbours, self.distances_2 = self._gen_neighbours()
         
         # sert à initialiser la matrice des nuages
-        self.filler = np.frompyfunc(lambda x: list(), 1, 1)
+        self.filler = np.frompyfunc(lambda x: torch.tensor([]), 1, 1)
     
     def _gen_neighbours(self):
         # génère tous les déplacements possibles de -n à n dans chaque dim
@@ -104,8 +104,8 @@ class Nuage:
         # remplit le tableau
         for p in self.liste_points:
             x, y, z = self.segmentation.get_mat_coo(p)
-            self.mat[x, y, z].append(p)
-        
+            self.mat[x, y, z] = torch.cat((self.mat[x, y, z], p.unsqueeze(0)))
+    
     def recreate(self, points):
         """vide et re-rempli l'ancien tableau plutôt que de le supprimer et d'en allouer un nouveau"""
         self.liste_points = points
@@ -116,11 +116,10 @@ class Nuage:
         # remplit
         for p in self.liste_points:
             x, y, z = self.segmentation.get_mat_coo(p.detach())
-            self.mat[x, y, z].append(p)
+            self.mat[x, y, z] = torch.cat((self.mat[x, y, z], p.unsqueeze(0)))
         
         return self
     
-
     # pour afficher des statistiques: liste du nombre de points parcourus pour chaque appel à get_closest
     points_parcourus = []
     
@@ -141,7 +140,7 @@ class Nuage:
                 break
             
             # considère toutes les cases non vides à distance d de notre case
-            neighbours = [v for v in self.segmentation.get_neighbours(case_coo, d_2) if self.mat[v[0], v[1], v[2]]]
+            neighbours = [v for v in self.segmentation.get_neighbours(case_coo, d_2) if len(self.mat[v[0], v[1], v[2]])]
             if not len(neighbours): continue
             neighbours = np.array(neighbours)
             
@@ -167,11 +166,11 @@ class Nuage:
             for real_d_2, v in zip(cell_diff, neighbours):
                 if real_d_2 > closest_point:
                     break
-                    
+                
                 cpt_point_parcourus += len(self.mat[v[0], v[1], v[2]])
                 
                 # regarde si le point le plus proche parmi tous les points de la case est mieux
-                candidat = torch.min(torch.cat([torch.sum(torch.pow(point - p, 2)).unsqueeze(0) for p in self.mat[v[0], v[1], v[2]]]))
+                candidat = torch.min(torch.sum(torch.pow(point - self.mat[v[0], v[1], v[2]], 2), dim=(1,)))
                 if candidat < closest_point:
                     closest_point = candidat
             else:
@@ -182,12 +181,21 @@ class Nuage:
         # return torch.sqrt(closest_point)
         return closest_point
     
-    def chamfer(self, other):
+    def chamfer(self, other, simplify_loss=False, squared_distances=False):
         # les points doivent bien être atteint par un MLP
-        loss0 = torch.sum(torch.cat([self.get_closest(p).unsqueeze(0) for p in other.liste_points]))
+        loss0 = torch.cat([self.get_closest(p).unsqueeze(0) for p in other.liste_points])
+        if not squared_distances:
+            loss0 = torch.sqrt(loss0)
+        loss0 = torch.sum(loss0)
         
         # les MLP doivent bien atteindre un point
-        loss1 = torch.sum(torch.cat([other.get_closest(p).unsqueeze(0) for p in self.liste_points]))
+        if simplify_loss:
+            loss1 = 0
+        else:
+            loss1 = torch.cat([other.get_closest(p).unsqueeze(0) for p in self.liste_points])
+            if not squared_distances:
+                loss1 = torch.sqrt(loss1)
+            loss1 = torch.sum(loss1)
         
         return loss0, loss1
 
@@ -195,34 +203,30 @@ class Nuage:
 class Reconstructeur(nn.Module):
     def __init__(self, n_mlp, latent_size, n_grid_step, segmentation, quadratic):
         super().__init__()
-        print("nombre de MLP:", n_mlp)
-        print("résolution de la grille:", n_grid_step, "^2 =", n_grid_step ** 2)
-        print("taille des nuages générés:", n_mlp, "*", n_grid_step ** 2, "=", n_mlp * n_grid_step ** 2)
-        print("résolution segmentation:", segmentation.n_step, "^3 =", segmentation.n_step ** 3)
         self._nuage_tmp = Nuage([], segmentation)
         self.input_dim = 2
         self.output_dim = 3
         self.n_grid_step = n_grid_step
         self.verbose = True
         self.n_mlp = n_mlp
-
-        s = [128, 64]
-        # s = [512, 256, 128]
+        
+        # s = [128, 64]
+        s = [512, 256, 128]
         self.sizes = s
         
         # cf forward
         self.f0_a = nn.ModuleList([nn.Linear(latent_size, s[0]) for _ in range(n_mlp)])
         self.f0_b = nn.ModuleList([nn.Linear(self.input_dim, s[0]) for _ in range(n_mlp)])
-
+        
         self.decodeurs = nn.ModuleList([nn.Sequential(
             nn.ReLU(),
-    
+            
             nn.Linear(s[0], s[1]),
             nn.ReLU(),
-    
-            # nn.Linear(s[1], s[2]),
-            # nn.ReLU(),
-    
+            
+            nn.Linear(s[1], s[2]),
+            nn.ReLU(),
+            
             #on retourne un point dans l'espace de sortie
             nn.Linear(s[-1], self.output_dim),
             #tanh ramène dans [-1, 1], comme les nuages de notre auto-encodeur et de groueix
@@ -266,9 +270,9 @@ class Reconstructeur(nn.Module):
         if self.loss == Nuage.chamfer:
             res = self._nuage_tmp.recreate(res)
         return res
-
+    
     @staticmethod
-    def chamfer(Y, S):
+    def chamfer(Y, S, simplify_loss=False, squared_distances=False):
         """return chamfer loss between
         the generated set Y = {f(x, p) for each f, p}
         and the real pointcloud S corresponding to the latent vector x
@@ -278,10 +282,21 @@ class Reconstructeur(nn.Module):
         """
         normes = torch.cat([torch.cat([torch.sum(torch.pow(y - s, 2)).unsqueeze(0) for s in S]) for y in Y])
         normes = normes.reshape((len(Y), len(S)))
-        loss0 = torch.sum(torch.min(normes, dim=0)[0])
-        loss1 = torch.sum(torch.min(normes, dim=1)[0])
+        
+        loss0 = torch.min(normes, dim=0)[0]
+        if not squared_distances:
+            loss0 = torch.sqrt(loss0)
+        loss0 = torch.sum(loss0)
+        
+        if simplify_loss:
+            loss1 = 0
+        else:
+            loss1 = torch.min(normes, dim=1)[0]
+            if not squared_distances:
+                loss1 = torch.sqrt(loss1)
+            loss1 = torch.sum(loss1)
         return loss0, loss1
-    
+        
         # # On sert uniquement des min selon les deux axes, on peut ne pas stocker la matrice pour éviter les problèmes de RAM
         # # listes des minimums sur chaque ligne et colonne
         # min_axe0 = [torch.tensor(float("+inf"))] * len(S)
@@ -295,7 +310,8 @@ class Reconstructeur(nn.Module):
         # return torch.sum(min_axe0), torch.sum(min_axe1)
 
 
-def fit_reconstructeur(reconstructeur, x_train, y_train, x_test, y_test, epochs, lr=1e-5, grid_scale=1.0):
+def fit_reconstructeur(reconstructeur, x_train, y_train, x_test, y_test, epochs,
+                       lr=1e-5, grid_scale=1.0, list_pred=None, simplify_loss=False, squared_distances=False):
     """grid_scale:
         les points 3D générés sont calculés à partir d'un échantillonage d'un carré 1*1,
         prendre un carré 100*100 revient à augmenter les coefficients du premier Linear sans pénaliser le modèle
@@ -314,8 +330,11 @@ def fit_reconstructeur(reconstructeur, x_train, y_train, x_test, y_test, epochs,
             assert not x.requires_grad
             y_pred = reconstructeur.forward(x)
             
+            if list_pred is not None:
+                list_pred.append(y_pred.liste_points.detach().numpy().copy())
+            
             t_loss = time.time()
-            loss = reconstructeur.loss(y_pred, y)
+            loss = reconstructeur.loss(y_pred, y, simplify_loss, squared_distances)
             time_loss[epoch] += time.time() - t_loss
             
             # print("loss", loss)
@@ -332,7 +351,8 @@ def fit_reconstructeur(reconstructeur, x_train, y_train, x_test, y_test, epochs,
         if reconstructeur.verbose and (epochs < 10 or epoch % (epochs // 10) == 0):
             reconstructeur.eval()
             
-            s_test = sum(sum(reconstructeur.loss(reconstructeur.forward(x), y.data)).item() for (x, y) in zip(x_test, y_test))
+            s_test = sum(
+                sum(reconstructeur.loss(reconstructeur.forward(x), y.data)).item() for (x, y) in zip(x_test, y_test))
             
             print("time", epoch,
                   "loss train %.4e" % loss_train,
@@ -353,17 +373,73 @@ def draw_cloud(ax, c):
 
 
 def plot_tailles(clouds):
-    import matplotlib.pyplot as plt
     tailles = np.array([[len(x) for x in n.mat.reshape(-1)] for n in clouds], dtype=int).reshape(-1)
     plt.hist(tailles, bins=20, range=(1, max(tailles)))
     plt.show()
+
+
+def _main_anim():
+    import mpl_toolkits.mplot3d.axes3d as p3
+    import matplotlib.animation as animation
+    
+    n_mlp = 8
+    grid_points = 4
+    epochs = 30
+    simplify_loss = False
+    squared_distances = False
+    
+    lr = 1e-4
+    s = Segmentation(5)
+    cloud = Nuage(tSNE.get_clouds([0], 1, ratio=.01)[0], s)
+    latent_size = 25088
+    latent = tSNE.get_latent([0], 1, nPerObj=1)[0]
+    reconstructeur = Reconstructeur(n_mlp, latent_size, grid_points, s, quadratic=False)
+    list_pred = []
+    loss, t_loss, t_tot = fit_reconstructeur(reconstructeur, [latent], [cloud], [], [], epochs, lr=lr, list_pred=list_pred,
+                                             simplify_loss=simplify_loss, squared_distances=squared_distances)
+    
+    def update(i, pred, scattered):
+        # met a jour le nuage de point prédit
+        scattered[0].set_data(pred[i][:, 0], pred[i][:, 1])
+        scattered[0].set_3d_properties(pred[i][:, 2])
+        return scattered
+    
+    root = "../outputs_animation/"
+    file = "mlp" + str(n_mlp) + "_grid" + str(grid_points) + "_simplify" + str(simplify_loss) + "_squared" + str(squared_distances)
+    
+    plt.plot(np.log10(loss))
+    plt.title(file)
+    plt.savefig(root + file + "_loss")
+    plt.close('all')
+    
+    fig = plt.figure()
+    ax = p3.Axes3D(fig)
+    ax.set_axis_off()
+    ax.set_frame_on(False)
+    ax.set_xlim3d([-1.0, 1.0]);ax.set_ylim3d([-1.0, 1.0]);ax.set_zlim3d([-1.0, 1.0])
+    ax.set_title(file)
+    l = cloud.liste_points.detach().numpy()
+    scattered = [ax.plot([0], [0], [0], "g.")[0], ax.plot(l[:, 0], l[:, 1], l[:, 2], "r.")[0]]
+    
+    ani = animation.FuncAnimation(fig, update, epochs, fargs=(list_pred, scattered[:-1]), interval=500)
+    plt.show()  # le dernier angle de vu est utilisé pour l'animation
+    Writer = animation.writers['html']
+    writer = Writer(fps=15, bitrate=1800)
+    ani.save(root + file + ".html", writer=writer)
+    with open(root + file + "_time", "w") as f:
+        f.write("total " + str(sum(t_tot) / len(t_tot)) + "\t")
+        for t in t_tot:
+            f.write(str(t) + ",")
+        f.write("\n")
+        f.write("loss " + str(sum(t_loss) / len(t_loss)) + "\t")
+        for t in t_loss:
+            f.write(str(t) + ",")
 
 
 def _main():
     chosen_subset = [0]
     n_per_cat = 1
     clouds2 = tSNE.get_clouds(chosen_subset, n_per_cat, ratio=.001)
-    print("taille des nuages ground truth:", len(clouds2[0]))
     latent = tSNE.get_latent(chosen_subset, n_per_cat,
                              nPerObj=1)  # /!\ attention: il faut que les fichiers sur le disque correspondent
     
@@ -388,23 +464,30 @@ def _main():
     n_mlp = 5
     latent_size = 25088  # défini par l'encodeur utilisé
     grid_points = 4
-    epochs = 1
+    epochs = 5
     grid_size = 1e0
     lr = 1e-4
+    
+    print("taille des nuages ground truth:", len(clouds2[0]))
+    print("nombre de MLP:", n_mlp)
+    print("résolution de la grille:", grid_points, "^2 =", grid_points ** 2)
+    print("taille des nuages générés:", n_mlp, "*", grid_points ** 2, "=", n_mlp * grid_points ** 2)
+    print("résolution segmentation:", segmentation.n_step, "^3 =", segmentation.n_step ** 3)
     
     reconstructeur1 = Reconstructeur(n_mlp, latent_size, grid_points, segmentation, quadratic=False)
     reconstructeur2 = Reconstructeur(n_mlp, latent_size, grid_points, segmentation, quadratic=True)
     
     for reconstructeur, param in zip([reconstructeur1, reconstructeur2], [train_y, train_y2]):
-    # for reconstructeur, param in zip([reconstructeur1], [train_y]):
-    # for reconstructeur, param in zip([reconstructeur2], [train_y2]):
-        loss, t_loss, t_tot = fit_reconstructeur(reconstructeur, train_x, param, test_x, test_y, epochs, lr=lr, grid_scale=grid_size)
+        # for reconstructeur, param in zip([reconstructeur1], [train_y]):
+        # for reconstructeur, param in zip([reconstructeur2], [train_y2]):
+        loss, t_loss, t_tot = fit_reconstructeur(reconstructeur, train_x, param, test_x, test_y, epochs, lr=lr,
+                                                 grid_scale=grid_size)
         plt.plot(loss[1:])
         plt.show()
-        print("\ntemps: ")
+        print("temps: ")
         print("loss", sum(t_loss), t_loss)
         print("tot", sum(t_tot), t_tot)
-        print("ratio", sum(t_loss)/sum(t_tot), t_loss/t_tot)
+        print("ratio", sum(t_loss) / sum(t_tot), t_loss / t_tot, "\n")
     
     print("répartition point parcourus histogramme :")
     print(np.histogram(Nuage.points_parcourus))
@@ -419,30 +502,49 @@ def _main():
 def _test():
     s = Segmentation(5)
     c1 = Nuage(tSNE.get_clouds([0], 1, ratio=.01)[0], s)
-    c2 = torch.tensor([[0., 0, 0], [1, 1, 1], [-1, -1, -1], [.2,.3,.0]])
+    c2 = torch.tensor([[0., 0, 0], [1, 1, 1], [-1, -1, -1], [.2, .3, .0]])
     c2 = Nuage(c2, s)
-    n_mlp = 2; latent_size = 25088; grid_points = 4; epochs = 5; lr = 1e-4
+    n_mlp = 2;latent_size = 25088;grid_points = 4;epochs = 5;lr = 1e-4
     latent = tSNE.get_latent([0], 1, nPerObj=1)[0]
     
-    # équivalence des deux fonctions de loss
+    # équivalence des deux fonctions de loss (avec points écrits à la main)
     assert Nuage.chamfer(c1, c2) == Reconstructeur.chamfer(c1.liste_points, c2.liste_points)
-
     
-    torch.manual_seed(0); np.random.seed(0)
+    # presque équivalence de convergence
+    # (utilise les mêmes nombres aléatoires pour avoir le même résultat)
+    torch.manual_seed(0);np.random.seed(0)
     reconstructeur1 = Reconstructeur(n_mlp, latent_size, grid_points, s, quadratic=False)
-    torch.manual_seed(0); np.random.seed(0)
+    torch.manual_seed(0);np.random.seed(0)
     reconstructeur2 = Reconstructeur(n_mlp, latent_size, grid_points, s, quadratic=True)
-
+    
     loss1, t_loss1, t_tot1 = fit_reconstructeur(reconstructeur1, [latent], [c1], [], [], epochs, lr=lr)
     loss2, t_loss2, t_tot2 = fit_reconstructeur(reconstructeur2, [latent], [c1.liste_points], [], [], epochs, lr=lr)
-    print(loss1)
-    print(loss2)
+    
+    # différences sûrement dues à des erreurs d'arrondi
     assert np.all(np.abs(np.array(loss1) - np.array(loss2)) < 1e-1)
+    print("tests passés")
+
 
 if __name__ == '__main__':
-    _test()
+    # _test()
+    _main_anim()
+    exit()
     _main()
 
 # torch.save(the_model.state_dict(), PATH)
 # the_model = TheModelClass(*args, **kwargs)
 # the_model.load_state_dict(torch.load(PATH))
+
+
+"""todo list
+
+calculer/mesurer coût en fonction de
+  ground_truth_size
+  n_mlp
+  grid_point
+  (epochs, n_clouds)
+  loss chamfer ou simplifiée
+  loss distances au carrées ou non
+
+
+save 3D"""

@@ -89,7 +89,7 @@ class AutoEncoder3D(torch.nn.Module):
             
             list_loss_train.append(s_train)
             
-            if self.verbose and (t==0 or (t+1) % (self.epochs // 10) == 0):
+            if t==0 or self.epochs<10 or (t+1) % (self.epochs // 10) == 0:
                 self.eval()
                 
                 list_test_ind.append(t)
@@ -97,9 +97,10 @@ class AutoEncoder3D(torch.nn.Module):
                 s_test = sum(chamfer(self.forward(x), x.data).item() for x in x_test)/len(x_test) if len(x_test) else 0
                 list_loss_test.append(s_test)
                 
-                print("time", t,
-                      "loss train %.1e" % s_train,
-                      "loss test %.1e" % s_test)
+                if self.verbose:
+                    print("time", t,
+                          "loss train %.1e" % s_train,
+                          "loss test %.1e" % s_test)
                 self.train()
                 
                 if s_train / len(x_train) < 1e-8:
@@ -148,7 +149,7 @@ def gen_plan(n_plan, n_per_plan, bruit=None):
     points = np.array(points)
     
     # remet dans [-1, 1]
-    points[:, 2] = points[:, 2] * (2 / (np.max(points[2,:]) - np.min(points[:,2]))) - 1
+    points[:, 2] = points[:, 2] * (2 / (np.max(points[:,2]) - np.min(points[:,2]))) - 1
     return torch.tensor(points).float()
 
 
@@ -171,7 +172,7 @@ def cross_validation(model_param, data, fold=5, lr=1e-4):
             data_test = data[batch_size * i: batch_size * (i + 1)]
             data_train = data[:batch_size * i] + data[batch_size * (i + 1):]
             
-            p_train, p_test = model.fit(data_train, data_test, lr)
+            p_train, p_test, test_ind = model.fit(data_train, data_test, lr)
             
             acc_train_test.append([p_train[-1], p_test[-1]])
         
@@ -180,7 +181,7 @@ def cross_validation(model_param, data, fold=5, lr=1e-4):
         std_train.append(np.std(acc_train_test[:, 0]))
         mean_test.append(np.mean(acc_train_test[:, 1]))
         std_test.append(np.std(acc_train_test[:, 1]))
-        print(mean_test[-1])
+        print("score test final", mean_test[-1])
     
     return np.array(mean_train), np.array(std_train), np.array(mean_test), np.array(std_test)
 
@@ -191,7 +192,7 @@ def draw_cloud(ax, c):
 
 def _main_fit_forward_draw(clouds, param, n_draw):
     # FIT entrainement sur 100% pour l'affichage
-    print("fit en cours")
+    print("DRAW, fit en cours")
     model = AutoEncoder3D(*param)
     model.verbose = True
     print("loss moyenne finale", model.fit(clouds, []))
@@ -214,12 +215,13 @@ def _main_fit_forward_draw(clouds, param, n_draw):
 
 
 def _main_plot_cross_validation(clouds, n_points, space_dim, n_cross_validation):
-    epochs = [1, 5, 10, 20]
+    print("CROSS VALIDATION")
+    epochs = [1, 5, 10]
     latent_sizes = [2]
     #cross validation pour les mesures
     params = [[(n_points, space_dim, latent_size, epoch) for epoch in epochs] for latent_size in latent_sizes]
     params = np.array(params).reshape((-1, 4))
-    mean_train, std_train, mean_test, std_test = cross_validation(params, clouds, n_cross_validation, lr=1e-5)
+    mean_train, std_train, mean_test, std_test = cross_validation(params, clouds, n_cross_validation, lr=1e-4)
     
     #proportion de data utilisé pour les test
     p = 1 / n_cross_validation
@@ -232,6 +234,7 @@ def _main_plot_cross_validation(clouds, n_points, space_dim, n_cross_validation)
 
 
 def _main_clustering(clouds, n_classes, n_points, space_dim):
+    print("CLUSTERING")
     latent_size = 2
     epochs = 20
     model = AutoEncoder3D(n_points, space_dim, latent_size, epochs)
@@ -255,8 +258,8 @@ def _main():
     
     n_points = 20
     
-    range_gauss  = range(1,2)
-    range_sphere = range(1,1)
+    range_gauss  = range(1,1)
+    range_sphere = range(1,2)
     range_plan = range(1,2)
     
     #ne marche pas : [lambda :gen_sphere(i, ...) for i in range(1,4)]
@@ -281,20 +284,18 @@ def _main():
     #     draw_cloud(ax, clouds[i])
     #     plt.show()
     
+    _main_plot_cross_validation(clouds, n_points, space_dim, n_cross_validation)
+    
     _main_clustering(clouds, len(cloud_generator), n_points, space_dim)
     
     _main_fit_forward_draw(clouds, (n_points, space_dim, 2, 50), 400*len(cloud_generator))
 
-    _main_plot_cross_validation(clouds, n_points, space_dim, n_cross_validation)
 
 if __name__ == '__main__':
     _main()
 
 """
-rajouter une couche 64
-
+rajouter une couche 64 (inutile)
 stats par type de forme err std
-
 visualiser regroupement en clusters avec espace latent de taille 2
-
-google colab"""
+"""
