@@ -82,6 +82,10 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
   - Importer / coder une des techniques de reconstruction 3D existantes afin de l'utiliser comme une baseline pour l'évaluation de notre modèle.
 
 - 26/03
+  - manière optimisée de calcul du forward et chamfer acceptés.
+  - faire varier l'importance du deuxième facteur de chamfer, faire la moyenne plutôt que la somme des min
+
+- 02/04
 
 Projet effectué à l'UPMC dans le master DAC pour le M1S2 de l'année 2018/2019.
 Encadrants : Vincent Guigue & Nicolas Baskiotis.

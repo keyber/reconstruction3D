@@ -94,26 +94,24 @@ class Nuage:
         # return torch.sqrt(closest_point)
         return closest_point
     
-    def chamfer_seg(self, other, k=1, squared_distances=False):
+    def chamfer_seg(self, other, k=1):
+        k1 = 1/(1+k)
+        k2 = k/(1+k)
         # les points doivent bien être atteint par un MLP
-        loss0 = torch.cat([self.get_closest(p).unsqueeze(0) for p in other.liste_points])
-        if not squared_distances:
-            loss0 = torch.sqrt(loss0)
-        loss0 = torch.sum(loss0) / len(other.liste_points)
+        loss0 = torch.sum(torch.cat([self.get_closest(p).unsqueeze(0) for p in other.liste_points]))
+        loss0 *= k1 / len(other.liste_points)
         
         # les MLP doivent bien atteindre un point
-        if k == 0:
+        if k2 == 0:
             loss1 = 0
         else:
-            loss1 = torch.cat([other.get_closest(p).unsqueeze(0) for p in self.liste_points])
-            if not squared_distances:
-                loss1 = torch.sqrt(loss1)
-            loss1 = torch.sum(loss1) / len(self.liste_points)
+            loss1 = torch.sum(torch.cat([other.get_closest(p).unsqueeze(0) for p in self.liste_points]))
+            loss1 *= k2 / len(self.liste_points)
         
-        return loss0, loss1 * k
+        return loss0, loss1
 
     @staticmethod
-    def chamfer_quad(self, other, k=1, squared_distances=False):
+    def chamfer_quad(self, other, k=1):
         """return chamfer loss between
         the generated set Y = {f(x, p) for each f, p}
         and the real pointcloud S corresponding to the latent vector x
@@ -121,22 +119,21 @@ class Nuage:
         sum_F(sum_A) et min_A(min_F) correspondent à une simple somme ou min sur l'ensemble des données
         donc on représente l'ensemble des points générés Y comme une liste et non comme une matrice
         """
+        k1 = 1/(1+k)
+        k2 = k/(1+k)
+        
         normes = torch.cat([torch.cat([torch.sum(torch.pow(y - s, 2)).unsqueeze(0) for s in other]) for y in self])
         normes = normes.reshape((len(self), len(other)))
     
-        loss0 = torch.min(normes, dim=0)[0]
-        if not squared_distances:
-            loss0 = torch.sqrt(loss0)
-        loss0 = torch.sum(loss0) / len(other)
+        loss0 = torch.sum(torch.min(normes, dim=0)[0])
+        loss0 *= k1 / len(other)
     
-        if k == 0:
+        if k2 == 0:
             loss1 = 0
         else:
-            loss1 = torch.min(normes, dim=1)[0]
-            if not squared_distances:
-                loss1 = torch.sqrt(loss1)
-            loss1 = torch.sum(loss1) / len(self)
-        return loss0, k * loss1
+            loss1 = torch.sum(torch.min(normes, dim=1)[0])
+            loss1 *= k2 / len(self)
+        return loss0, loss1
     
         # # On sert uniquement des min selon les deux axes, on peut ne pas stocker la matrice pour éviter les problèmes de RAM
         # # listes des minimums sur chaque ligne et colonne
