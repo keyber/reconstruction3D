@@ -11,7 +11,7 @@ import input_output
 
 def _main():
     chosen_subset = [2]
-    n_per_cat = 10
+    n_per_cat = 50
     clouds = input_output.get_clouds(chosen_subset, n_per_cat, ratio=.01)
     latent = input_output.get_latent(chosen_subset, n_per_cat,
                              nPerObj=1)  # /!\ attention: il faut que les fichiers sur le disque correspondent
@@ -33,7 +33,7 @@ def _main():
     n_mlp = 10
     latent_size = 25088  # défini par l'encodeur utilisé
     grid_points = 4
-    epochs = 30
+    epochs = 9
     grid_size = 1e0
     lr = 1e-4
     loss_factor = [.001]*(epochs*2//3) + [10.0]*(epochs//3)

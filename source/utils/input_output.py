@@ -30,23 +30,18 @@ def _gen_clouds(root, id_category, nPerCat, ratio_sous_echantillonage):
     res = []
     for cat in id_category:
         path = root + str(cat) + "/ply/"
-        cpt = 0
-        for key in sorted(os.listdir(path)):
-            #ignore les fichiers .txt
-            if key[-4:] != ".txt":
-                sub_path = path + key
-                cloud = ply.read_ply(sub_path)['points']
-                
-                sub_sampled = []
-                for i, x in enumerate(cloud.values[:, :3]):
-                    if len(sub_sampled) < ratio_sous_echantillonage * (i + 1):
-                        sub_sampled.append(torch.tensor(x))
-                
-                res.append(torch.cat(sub_sampled).reshape((-1, 3)))
-                
-                cpt += 1
-                if cpt == nPerCat:
-                    break
+        # ignore les fichiers .txt
+        keys = [key for key in os.listdir(path) if key[-4:]!=".txt"]
+        for key in sorted(keys)[:nPerCat]:
+            sub_path = path + key
+            cloud = ply.read_ply(sub_path)['points']
+            
+            sub_sampled = []
+            for i, x in enumerate(cloud.values[:, :3]):
+                if len(sub_sampled) < ratio_sous_echantillonage * (i + 1):
+                    sub_sampled.append(torch.tensor(x))
+            
+            res.append(torch.cat(sub_sampled).reshape((-1, 3)))
     
     return np.array(res, dtype=torch.Tensor)
 
