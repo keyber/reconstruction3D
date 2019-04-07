@@ -109,7 +109,8 @@ class Nuage:
             loss1 *= k2 / len(self.liste_points)
         
         return loss0, loss1
-
+    
+    warning = True
     @staticmethod
     def chamfer_quad(self, other, k=1):
         """return chamfer loss between
@@ -119,6 +120,11 @@ class Nuage:
         sum_F(sum_A) et min_A(min_F) correspondent à une simple somme ou min sur l'ensemble des données
         donc on représente l'ensemble des points générés Y comme une liste et non comme une matrice
         """
+        if type(self) == Nuage:
+            if Nuage.warning:
+                print("remplissage de la grille inutile")
+                Nuage.warning = False
+            self = self.liste_points
         k1 = 1/(1+k)
         k2 = k/(1+k)
         

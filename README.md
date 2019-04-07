@@ -74,7 +74,7 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
   - Face au problème de performances de la distance de Chamfer, Google Colab a été mentionné.
 
 - 12/03
-  - Visualisation du auto-encoder à expliquer
+  - Visualisation de l'auto-encoder à expliquer
   - Visualiser plan vs sphere
   - Chamfer O(n) ne suffit pas, il faut utiliseer Google Colab
   - Chamfer doit utiliser des fonctions de pytorch et non de numpy
@@ -86,6 +86,15 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
   - faire varier l'importance du deuxième facteur de chamfer, faire la moyenne plutôt que la somme des min
 
 - 02/04
+  - animation OK.
+  - train converge mais pas test
+     - afficher la loss en test de l'epoch 0
+     - afficher animation sur test.
+     - avoir un nombre de point générés à peu près équivalent au ground-truth
+     - re-sampler la grille et l'output à chaque epoch
+     - essayer des formes plus simples que des lampes
+  - (afficher zones non couvertes dans l'optique de rajouter un MLP "à la volée"?)
+  - (après entraînement, générer des nuages plus denses. Relier les points pour former des faces)
 
 Projet effectué à l'UPMC dans le master DAC pour le M1S2 de l'année 2018/2019.
 Encadrants : Vincent Guigue & Nicolas Baskiotis.

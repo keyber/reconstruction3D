@@ -3,13 +3,13 @@ from torch import nn
 import numpy as np
 import time
 from nuage import Nuage
+import random
 
 
 class Reconstructeur(nn.Module):
     def __init__(self, n_mlp, latent_size, n_grid_step, segmentation, quadratic=False):
         super().__init__()
-        if not quadratic:
-            self.nuage_tmp = Nuage([], segmentation)
+        self.nuage_tmp = Nuage([], segmentation)
         self.input_dim = 2
         self.output_dim = 3
         self.n_grid_step = n_grid_step
@@ -67,46 +67,87 @@ class Reconstructeur(nn.Module):
         y0_b = torch.cat([torch.cat([f(p) for p in self.grid]) for f in self.f0_b])
         y0_b = y0_b.reshape((self.n_mlp, len(self.grid), -1))
         
-        # combine somme
+        # somme les deux parties
         y0 = torch.add(y0_a, y0_b)
         
-        # le reste
+        # applique le reste du réseau
         res = torch.cat([torch.cat([f(x) for x in e]) for f, e in zip(self.decodeurs, y0)])
         res = res.reshape((self.n_mlp * len(self.grid), self.output_dim))
         return res
     
 
-def fit_reconstructeur(reconstructeur, train, epochs,
+def fit_reconstructeur(reconstructeur, train, epochs, sample_size=None,
                        lr=1e-4, lr_decay=.05, grid_scale=1, loss_factor=1.0,
-                       list_predicted=None, test=None, ind_plotted=range(0)):
-    """grid_scale:
+                       ind_cloud_saved=range(0), test=None, list_epoch_loss=range(0)):
+    """
+    grid_scale:
         les points 3D générés sont calculés à partir d'un échantillonage d'un carré 1*1,
-        prendre un carré 100*100 revient à augmenter les coefficients du premier Linear sans pénaliser le modèle"""
+        prendre un carré 100*100 revient à augmenter les coefficients du premier Linear sans pénaliser le modèle
+        
+    ind_predicted:
+        indices dans train ou test pour lesquels sauvegarder l'évolution des prédictions
+        (les indices de test suivent ceux de train)
+    
+    ind_plotted:
+        indices pour lesquels calculer la loss en test
+    """
     if type(loss_factor) == float:
         loss_factor = [loss_factor]*epochs
     assert len(loss_factor) == epochs
     
-    reconstructeur.grid *= grid_scale
-    optimizer = torch.optim.Adagrad(reconstructeur.parameters(), lr=lr, lr_decay=lr_decay)
-    # optimizer = torch.optim.SGD(reconstructeur.parameters(), lr=lr)
+    if sample_size is None:
+        # considère tous les points à chaque itération
+        sample_size = len(train[1][0].liste_points)
+    sample_weights = torch.ones(len(train[1][0].liste_points))
     
+    list_predicted = {i:[] for i in ind_cloud_saved}
     list_loss_train = []
     list_loss_test = []
     time_tot = time.time()
     time_loss = 0
+    
+    reconstructeur.grid *= grid_scale
+    optimizer = torch.optim.Adagrad(reconstructeur.parameters(), lr=lr, lr_decay=lr_decay)
+    # optimizer = torch.optim.SGD(reconstructeur.parameters(), lr=lr)
     for epoch in range(epochs):
         loss_train = 0
-        for x, y in zip(train[0], train[1]):
+        loss_test = 0
+        
+        with torch.no_grad():
+            reconstructeur.eval()
+            
+            # calcule la loss en test
+            if epoch in list_epoch_loss:
+                # ne se sert pas du même loss_factor que pour train
+                if test is not None and len(test[0]):
+                    loss_test = [reconstructeur.loss(reconstructeur.nuage_tmp.recreate(reconstructeur.forward(x)),
+                                                     y[torch.multinomial(sample_weights, sample_size)], k=1)
+                              for (x, y) in zip(test[0], test[1])]
+                    loss_test = sum([s[0].item() + s[1].item() for s in loss_test])
+                    list_loss_test.append(loss_test/len(test[1]))
+            
+            # sauvegarde pour l'animation
+            for i in ind_cloud_saved:
+                # les tests sont considérés comme étant juste après les train
+                if i-len(train[0]) >= 0:
+                    list_predicted[i].append(reconstructeur.forward(test[0][i-len(train[0])]).detach().numpy())
+                
+            reconstructeur.train()
+        
+        # train
+        for i in range(len(train[0])):
+            x = train[0][i]
+            y = train[1][i]
             assert not x.requires_grad
+            
             y_pred = reconstructeur.forward(x)
             
-            if list_predicted is not None:
-                list_predicted.append(y_pred.detach().numpy().copy())
+            if i in ind_cloud_saved:
+                list_predicted[i].append(y_pred.detach().numpy().copy())
             
             time0 = time.time()
-            if reconstructeur.loss == Nuage.chamfer_seg:
-                y_pred = reconstructeur.nuage_tmp.recreate(y_pred)
-            loss = reconstructeur.loss(y_pred, y, loss_factor[epoch])
+            y_pred = reconstructeur.nuage_tmp.recreate(y_pred)
+            loss = reconstructeur.loss(y_pred, y[torch.multinomial(sample_weights, sample_size)], loss_factor[epoch])
             time_loss += time.time() - time0
             
             print("loss", loss)
@@ -117,29 +158,23 @@ def fit_reconstructeur(reconstructeur, train, epochs,
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-        list_loss_train.append(loss_train/len(train[1]))
-        
-        if epoch in ind_plotted:
-            reconstructeur.eval()
+
+        list_loss_train.append(loss_train / len(train[1]))
             
-            # ne se sert pas du même loss_factor que pour train
-            if test is None:
-                s_test = 0
-            else:
-                s_test = sum(sum(reconstructeur.loss(reconstructeur.nuage_tmp.recreate(reconstructeur.forward(x)),
-                                                     y, k=1)).item()
-                             for (x, y) in zip(test[0], test[1]))
+        if epoch in list_epoch_loss:
             print("time", epoch,
-                  "loss train %.4e" % loss_train,
-                  "loss test %.2e" % s_test)
-            list_loss_test.append(s_test)
-            reconstructeur.train()
-    
+                  "loss train %.3e" % loss_train,
+                  "loss test %.3e" % loss_test)
+        
     #apprentissage fini, passage en mode évaluation
     reconstructeur.eval()
     time_tot = time.time() - time_tot
     print("temps loss", time_loss," tot", time_tot, "ratio", time_loss/time_tot)
-    return list_loss_train, list_loss_test, (time_loss, time_tot, time_loss/time_tot)
+    return {"loss_train": list_loss_train,
+            "loss_test":  list_loss_test,
+            "predicted":  list_predicted,
+            "time":       (time_tot, time_loss, time_loss/time_tot),
+            }
 
 
 def _test():
@@ -163,16 +198,20 @@ def _test():
     torch.manual_seed(0);np.random.seed(0)
     reconstructeur2 = Reconstructeur(n_mlp, latent_size, grid_points, s, quadratic=True)
     
-    loss1, _, _ = fit_reconstructeur(reconstructeur1, ([latent], [c1             ]), epochs)
+    res1 = fit_reconstructeur(reconstructeur1, ([latent], [c1             ]), epochs)
     print()
-    loss2, _, _ = fit_reconstructeur(reconstructeur2, ([latent], [c1.liste_points]), epochs)
+    res2 = fit_reconstructeur(reconstructeur2, ([latent], [c1.liste_points]), epochs)
     
     # différences sûrement dues à des erreurs d'arrondi
-    assert np.all(np.abs(np.array(loss1) - np.array(loss2)) < 1e-3)
+    assert np.all(np.abs(np.array(res1["loss_train"]) - np.array(res2["loss_train"])) < 1e-3)
     print("tests passés")
 
 
 if __name__ == '__main__':
+    weights = torch.tensor([1, 10, 3, 0], dtype=torch.float)  # create a tensor of weights
+    x = torch.multinomial(weights, 2)
+    print(x)
+    print(weights[x])
     _test()
 
 # torch.save(the_model.state_dict(), PATH)
