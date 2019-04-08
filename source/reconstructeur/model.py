@@ -3,7 +3,6 @@ from torch import nn
 import numpy as np
 import time
 from nuage import Nuage
-import random
 
 
 class Reconstructeur(nn.Module):
@@ -98,7 +97,6 @@ def fit_reconstructeur(reconstructeur, train, epochs, sample_size=None,
     if sample_size is None:
         # considère tous les points à chaque itération
         sample_size = len(train[1][0].liste_points)
-    sample_weights = torch.ones(len(train[1][0].liste_points))
     
     list_predicted = {i:[] for i in ind_cloud_saved}
     list_loss_train = []
@@ -115,13 +113,12 @@ def fit_reconstructeur(reconstructeur, train, epochs, sample_size=None,
         
         with torch.no_grad():
             reconstructeur.eval()
-            
             # calcule la loss en test
             if epoch in list_epoch_loss:
                 # ne se sert pas du même loss_factor que pour train
                 if test is not None and len(test[0]):
                     loss_test = [reconstructeur.loss(reconstructeur.nuage_tmp.recreate(reconstructeur.forward(x)),
-                                                     y[torch.multinomial(sample_weights, sample_size)], k=1)
+                                                     y.sub_sample(sample_size), k=1)
                               for (x, y) in zip(test[0], test[1])]
                     loss_test = sum([s[0].item() + s[1].item() for s in loss_test])
                     list_loss_test.append(loss_test/len(test[1]))
@@ -137,7 +134,7 @@ def fit_reconstructeur(reconstructeur, train, epochs, sample_size=None,
         # train
         for i in range(len(train[0])):
             x = train[0][i]
-            y = train[1][i]
+            y = train[1][i].sub_sample(sample_size)
             assert not x.requires_grad
             
             y_pred = reconstructeur.forward(x)
@@ -147,7 +144,8 @@ def fit_reconstructeur(reconstructeur, train, epochs, sample_size=None,
             
             time0 = time.time()
             y_pred = reconstructeur.nuage_tmp.recreate(y_pred)
-            loss = reconstructeur.loss(y_pred, y[torch.multinomial(sample_weights, sample_size)], loss_factor[epoch])
+            
+            loss = reconstructeur.loss(y_pred, y, loss_factor[epoch])
             time_loss += time.time() - time0
             
             print("loss", loss)
@@ -198,9 +196,9 @@ def _test():
     torch.manual_seed(0);np.random.seed(0)
     reconstructeur2 = Reconstructeur(n_mlp, latent_size, grid_points, s, quadratic=True)
     
-    res1 = fit_reconstructeur(reconstructeur1, ([latent], [c1             ]), epochs)
+    res1 = fit_reconstructeur(reconstructeur1, ([latent], [c1]), epochs)
     print()
-    res2 = fit_reconstructeur(reconstructeur2, ([latent], [c1.liste_points]), epochs)
+    res2 = fit_reconstructeur(reconstructeur2, ([latent], [c1]), epochs)
     
     # différences sûrement dues à des erreurs d'arrondi
     assert np.all(np.abs(np.array(res1["loss_train"]) - np.array(res2["loss_train"])) < 1e-3)
@@ -208,10 +206,6 @@ def _test():
 
 
 if __name__ == '__main__':
-    weights = torch.tensor([1, 10, 3, 0], dtype=torch.float)  # create a tensor of weights
-    x = torch.multinomial(weights, 2)
-    print(x)
-    print(weights[x])
     _test()
 
 # torch.save(the_model.state_dict(), PATH)

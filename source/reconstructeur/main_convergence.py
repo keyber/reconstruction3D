@@ -11,9 +11,15 @@ sys.path.append('./utils/')
 import input_output
 
 
+def plot_tailles(clouds):
+    tailles = np.array([[len(x) for x in n.mat.reshape(-1)] for n in clouds], dtype=int).reshape(-1)
+    plt.hist(tailles, bins=20, range=(1, max(tailles)))
+    plt.show()
+
+
 def _main():
     chosen_subset = [2]
-    n_per_cat = 2
+    n_per_cat = 50
     sample_size = 300
     clouds = input_output.get_clouds(chosen_subset, n_per_cat, ratio=10*sample_size/30000)
     latent = input_output.get_latent(chosen_subset, n_per_cat, nPerObj=1)  # /!\ attention: il faut que les fichiers sur le disque correspondent
@@ -35,7 +41,7 @@ def _main():
     grid_size = 1e0
     n_mlp = 8
     grid_points = 6
-    epochs = 9
+    epochs = 5
     lr = 1e-4
     loss_factor_mode = 0
 
@@ -62,12 +68,21 @@ def _main():
                              list_epoch_loss=list_epoch_loss,
                              ind_cloud_saved=ind_cloud_saved)
     
-    
     root = os.path.abspath(os.path.dirname(__file__)) + "/../../outputs_animation/"
     file = "mlp" + str(n_mlp) + "_grid" + str(grid_points) + "_lossmode" + str(loss_factor_mode) + "_idcat"\
            + (str(chosen_subset[0] if len(chosen_subset)==1 else chosen_subset))
     
-    
+    save(root, file, res, epochs, list_epoch_loss, clouds, ind_cloud_saved)
+
+
+def update(i, pred, scattered):
+    # met a jour le nuage de point prédit
+    scattered.set_data(pred[i][:, 0], pred[i][:, 1])
+    scattered.set_3d_properties(pred[i][:, 2])
+    return scattered
+
+
+def save(root, file, res, epochs, list_epoch_loss, clouds, ind_cloud_saved):
     plt.plot(range(epochs), np.log10(res["loss_train"]))
     if res["loss_test"]:
         plt.plot(list_epoch_loss, np.log10(res["loss_test"]))
@@ -88,12 +103,6 @@ def _main():
     # input_output.write_clouds(os.path.abspath(os.path.dirname(__file__)) + "/../../data/output_clouds", output)
 
 
-    def update(i, pred, scattered):
-        # met a jour le nuage de point prédit
-        scattered.set_data(pred[i][:, 0], pred[i][:, 1])
-        scattered.set_3d_properties(pred[i][:, 2])
-        return scattered
-    
     for ind_c in ind_cloud_saved:
         fig = plt.figure()
         ax = p3.Axes3D(fig)
@@ -115,11 +124,6 @@ def _main():
         Writer = animation.writers['html']
         writer = Writer(fps=15, bitrate=1800)
         ani.save(root + file + ".html", writer=writer)
-
-def plot_tailles(clouds):
-    tailles = np.array([[len(x) for x in n.mat.reshape(-1)] for n in clouds], dtype=int).reshape(-1)
-    plt.hist(tailles, bins=20, range=(1, max(tailles)))
-    plt.show()
 
 
 if __name__ == '__main__':

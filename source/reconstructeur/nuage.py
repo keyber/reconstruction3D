@@ -18,6 +18,8 @@ class Nuage:
         for p in self.liste_points:
             x, y, z = self.segmentation.get_mat_coo(p)
             self.mat[x, y, z] = torch.cat((self.mat[x, y, z], p.unsqueeze(0)))
+
+        self.sample_weights = torch.ones(len(self.liste_points))
     
     def recreate(self, points):
         """vide et re-rempli l'ancien tableau plutôt que de le supprimer et d'en allouer un nouveau"""
@@ -32,6 +34,9 @@ class Nuage:
             self.mat[x, y, z] = torch.cat((self.mat[x, y, z], p.unsqueeze(0)))
         
         return self
+    
+    def sub_sample(self, sample_size):
+        return Nuage(self.liste_points[torch.multinomial(self.sample_weights, sample_size)], self.segmentation)
     
     # pour afficher des statistiques: liste du nombre de points parcourus pour chaque appel à get_closest
     points_parcourus = []
@@ -120,11 +125,12 @@ class Nuage:
         sum_F(sum_A) et min_A(min_F) correspondent à une simple somme ou min sur l'ensemble des données
         donc on représente l'ensemble des points générés Y comme une liste et non comme une matrice
         """
-        if type(self) == Nuage:
+        if type(self) == Nuage or type(other)==Nuage:
             if Nuage.warning:
                 print("remplissage de la grille inutile")
                 Nuage.warning = False
             self = self.liste_points
+            other = other.liste_points
         k1 = 1/(1+k)
         k2 = k/(1+k)
         
