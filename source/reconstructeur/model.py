@@ -147,7 +147,7 @@ def fit_reconstructeur(reconstructeur, train, epochs, sample_size=None,
             time0 = time.time()
             y_pred = Nuage(y_pred, eps=0)
             
-            loss = reconstructeur.loss(y_pred, y, k=loss_factor[epoch], sub_sampling=sub_sampling[i])
+            loss = reconstructeur.loss(y_pred, y, k=loss_factor[epoch], sub_sampling=sub_sampling[epoch])
             time_loss += time.time() - time0
             
             print("loss", loss)

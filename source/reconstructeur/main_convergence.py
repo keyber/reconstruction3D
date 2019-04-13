@@ -12,8 +12,8 @@ from sklearn.model_selection import train_test_split
 
 
 def _main():
-    chosen_subset = [2]
-    n_per_cat = 3
+    chosen_subset = [1]
+    n_per_cat = 4
     sample_size = 300
     eps_ground_truth = 1e-5 # algorithme eps approché: la distance obtenue est inférieure à (1 + eps) * opt
     clouds = input_output.get_clouds(chosen_subset, n_per_cat, ratio=10*sample_size)
@@ -84,7 +84,7 @@ def save(root, file, res, epochs, list_epoch_loss, clouds, ind_cloud_saved):
     
     for ind_c in ind_cloud_saved:
         plt.close("all")
-        fig = plt.figure()
+        fig = plt.figure('figure')
         ax = p3.Axes3D(fig)
         ax.set_axis_off()
         ax.set_frame_on(False)
@@ -110,11 +110,10 @@ if __name__ == '__main__':
     _main()
 
 """
-formes simples (ex spheres)
-minibatch converge bien ou moyenne ?
-
 visualiser inférences àp même sampling
 resortir un nuage avec bcp plus de points.
 essayer de les relier.
 
+minibatch converge bien ou moyenne ?
+X formes simples (ex spheres)
 """
