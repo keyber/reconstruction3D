@@ -25,7 +25,7 @@ def _gen_latent(root, id_category, nPerCat, nPerObj):
     return res  #torch.utils.data.DataLoader(res, nPerCat) todo
 
 
-def _gen_clouds(root, id_category, nPerCat, ratio_sous_echantillonage):
+def _gen_clouds(root, id_category, nPerCat, sous_echantillonage):
     root += "/"
     res = []
     for cat in id_category:
@@ -36,11 +36,18 @@ def _gen_clouds(root, id_category, nPerCat, ratio_sous_echantillonage):
             sub_path = path + key
             cloud = ply.read_ply(sub_path)['points']
             
+            if type(sous_echantillonage) == int:
+                ratio = sous_echantillonage / len(cloud.values)
+            else:
+                ratio = sous_echantillonage
+            
             sub_sampled = []
             for i, x in enumerate(cloud.values[:, :3]):
-                if len(sub_sampled) < ratio_sous_echantillonage * (i + 1):
+                if len(sub_sampled) / (i + 1) < ratio:
                     sub_sampled.append(torch.tensor(x))
             
+            assert len(sub_sampled) == ratio * len(cloud.values)
+            # noinspection PyTypeChecker
             res.append(torch.cat(sub_sampled).reshape((-1, 3)))
     
     return np.array(res, dtype=torch.Tensor)
@@ -127,7 +134,7 @@ def get_latent(chosenSubSet, nPerCat, nPerObj):
 
 
 def get_clouds(chosenSubSet, nPerCat, ratio):
-    assert 0 < ratio <= 1
+    assert type(ratio) is float and 0 < ratio <= 1 or type(ratio) is int
     path = os.path.abspath(os.path.dirname(__file__)) + "/../../../AtlasNet/data/customShapeNet"
     id_category = _get_categories(path, chosenSubSet)
     return _gen_clouds(path, id_category, nPerCat, ratio)

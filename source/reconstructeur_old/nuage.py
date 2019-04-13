@@ -18,7 +18,7 @@ class Nuage:
         for p in self.liste_points:
             x, y, z = self.segmentation.get_mat_coo(p)
             self.mat[x, y, z] = torch.cat((self.mat[x, y, z], p.unsqueeze(0)))
-
+        
         self.sample_weights = torch.ones(len(self.liste_points))
     
     def recreate(self, points):
@@ -100,9 +100,10 @@ class Nuage:
         return closest_point
     
     def chamfer_seg(self, other, k=1):
-        k1 = 1/(1+k)
-        k2 = k/(1+k)
+        k1 = 1 / (1 + k)
+        k2 = k / (1 + k)
         # les points doivent bien être atteint par un MLP
+        # noinspection PyTypeChecker
         loss0 = torch.sum(torch.cat([self.get_closest(p).unsqueeze(0) for p in other.liste_points]))
         loss0 *= k1 / len(other.liste_points)
         
@@ -110,12 +111,14 @@ class Nuage:
         if k2 == 0:
             loss1 = 0
         else:
+            # noinspection PyTypeChecker
             loss1 = torch.sum(torch.cat([other.get_closest(p).unsqueeze(0) for p in self.liste_points]))
             loss1 *= k2 / len(self.liste_points)
         
         return loss0, loss1
     
     warning = True
+    
     @staticmethod
     def chamfer_quad(self, other, k=1):
         """return chamfer loss between
@@ -125,28 +128,29 @@ class Nuage:
         sum_F(sum_A) et min_A(min_F) correspondent à une simple somme ou min sur l'ensemble des données
         donc on représente l'ensemble des points générés Y comme une liste et non comme une matrice
         """
-        if type(self) == Nuage or type(other)==Nuage:
+        if type(self) == Nuage or type(other) == Nuage:
             if Nuage.warning:
                 print("remplissage de la grille inutile")
                 Nuage.warning = False
             self = self.liste_points
             other = other.liste_points
-        k1 = 1/(1+k)
-        k2 = k/(1+k)
-        
+        k1 = 1 / (1 + k)
+        k2 = k / (1 + k)
+
+        # noinspection PyTypeChecker
         normes = torch.cat([torch.cat([torch.sum(torch.pow(y - s, 2)).unsqueeze(0) for s in other]) for y in self])
         normes = normes.reshape((len(self), len(other)))
-    
+        
         loss0 = torch.sum(torch.min(normes, dim=0)[0])
         loss0 *= k1 / len(other)
-    
+        
         if k2 == 0:
             loss1 = 0
         else:
             loss1 = torch.sum(torch.min(normes, dim=1)[0])
             loss1 *= k2 / len(self)
         return loss0, loss1
-    
+        
         # # On sert uniquement des min selon les deux axes, on peut ne pas stocker la matrice pour éviter les problèmes de RAM
         # # listes des minimums sur chaque ligne et colonne
         # min_axe0 = [torch.tensor(float("+inf"))] * len(S)
