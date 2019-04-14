@@ -165,7 +165,7 @@ def fit_reconstructeur(reconstructeur, train, epochs, sample_size=None,
         if epoch in list_epoch_loss:
             print("time", epoch,
                   "loss train %.3e" % (list_loss_train[-1][0]+list_loss_train[-1][1]),
-                  "loss test %.3e" % (list_loss_test[-1][0]+list_loss_test[-1][1]))
+                  "loss test %.3e" % (list_loss_test[-1][0]+list_loss_test[-1][1] if len(test[0]) else 0))
         
     #apprentissage fini, passage en mode évaluation
     reconstructeur.eval()
@@ -180,7 +180,7 @@ def fit_reconstructeur(reconstructeur, train, epochs, sample_size=None,
 
 def _test():
     import input_output
-    c1 = Nuage(input_output.get_clouds([0], 1, ratio=.01)[0], eps=0)
+    c1 = Nuage(input_output.get_clouds([0], 1, size=.01)[0], eps=0)
     c2 = torch.tensor([[0., 0, 0], [1, 1, 1], [-1, -1, -1], [.2, .3, .0]])
     c2 = Nuage(c2, eps=0)
     

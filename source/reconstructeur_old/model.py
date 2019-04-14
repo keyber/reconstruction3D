@@ -183,7 +183,7 @@ def _test():
     import input_output
 
     s = Segmentation(5)
-    c1 = Nuage(input_output.get_clouds([0], 1, ratio=.01)[0], s)
+    c1 = Nuage(input_output.get_clouds([0], 1, size=.01)[0], s)
     c2 = torch.tensor([[0., 0, 0], [1, 1, 1], [-1, -1, -1], [.2, .3, .0]])
     c2 = Nuage(c2, s)
     n_mlp = 2; latent_size = 25088; grid_points = 4; epochs = 5

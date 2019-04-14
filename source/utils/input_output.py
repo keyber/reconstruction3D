@@ -38,6 +38,8 @@ def _gen_clouds(root, id_category, nPerCat, sous_echantillonage):
             
             if type(sous_echantillonage) == int:
                 ratio = sous_echantillonage / len(cloud.values)
+                if ratio > 1:
+                    print("PAS ASSEZ DE POINTS DANS LE NUAGE", sous_echantillonage, '/', len(cloud.values))
             else:
                 ratio = sous_echantillonage
             
@@ -46,7 +48,7 @@ def _gen_clouds(root, id_category, nPerCat, sous_echantillonage):
                 if len(sub_sampled) / (i + 1) < ratio:
                     sub_sampled.append(torch.tensor(x))
             
-            assert len(sub_sampled) == ratio * len(cloud.values)
+            assert ratio>1 and len(sub_sampled) == len(cloud.values) or len(sub_sampled) == ratio * len(cloud.values)
             # noinspection PyTypeChecker
             res.append(torch.cat(sub_sampled).reshape((-1, 3)))
     
@@ -133,11 +135,13 @@ def get_latent(chosenSubSet, nPerCat, nPerObj):
     return latentVectors
 
 
-def get_clouds(chosenSubSet, nPerCat, ratio):
-    assert type(ratio) is float and 0 < ratio <= 1 or type(ratio) is int
+def get_clouds(chosenSubSet, nPerCat, size):
+    """ratio int or float
+    ratio > nombre de points dans le fichier => ratio=1 (+ warning)"""
+    assert type(size) is float and 0 < size <= 1 or type(size) is int
     path = os.path.abspath(os.path.dirname(__file__)) + "/../../../AtlasNet/data/customShapeNet"
     id_category = _get_categories(path, chosenSubSet)
-    return _gen_clouds(path, id_category, nPerCat, ratio)
+    return _gen_clouds(path, id_category, nPerCat, size)
 
 
 def write_clouds(path, clouds):

@@ -22,7 +22,7 @@ def _main():
     n_per_cat = 3
     sample_size = 300
     segmentation = Segmentation(5)
-    clouds = input_output.get_clouds(chosen_subset, n_per_cat, ratio=sample_size)
+    clouds = input_output.get_clouds(chosen_subset, n_per_cat, size=sample_size)
     latent = input_output.get_latent(chosen_subset, n_per_cat, nPerObj=1)  # /!\ attention: il faut que les fichiers sur le disque correspondent
     clouds = [Nuage(x, segmentation) for x in clouds]
     # plot_tailles(clouds)

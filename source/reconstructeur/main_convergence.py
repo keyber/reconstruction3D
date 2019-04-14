@@ -13,22 +13,22 @@ from sklearn.model_selection import train_test_split
 
 def _main():
     chosen_subset = [1]
-    n_per_cat = 4
-    sample_size = 300
+    n_per_cat = 10
+    sample_size = 3000
     eps_ground_truth = 1e-5 # algorithme eps approché: la distance obtenue est inférieure à (1 + eps) * opt
-    clouds = input_output.get_clouds(chosen_subset, n_per_cat, ratio=10*sample_size)
+    clouds = input_output.get_clouds(chosen_subset, n_per_cat, size=10 * sample_size)
     latent = input_output.get_latent(chosen_subset, n_per_cat, nPerObj=1)  # /!\ attention: il faut que les fichiers sur le disque correspondent
     clouds = [Nuage(x, eps=eps_ground_truth) for x in clouds]
     
     ratio_test = .2
-    train_x, test_x, train_y, test_y = train_test_split(latent, clouds, test_size=ratio_test)
+    train_x, test_x, train_y, test_y = train_test_split(latent, clouds, test_size=round(len(clouds)*ratio_test))
     print("train", len(train_y), "test", len(test_y))
     
     latent_size = 25088  # défini par l'encodeur utilisé
     grid_size = 1e0
     n_mlp = 8
     grid_points = 6
-    epochs = 10
+    epochs = 5
     lr = 1e-4
     loss_factor_mode = 0
 
@@ -92,11 +92,11 @@ def save(root, file, res, epochs, list_epoch_loss, clouds, ind_cloud_saved):
         ax.set_title(file)
         
         # trace un nuage contenant seulement un point en (0,0,0)
-        scattered = ax.plot([0], [0], [0], "g.")[0]
+        scattered = ax.plot([0], [0], [0], "g,")[0]
         
         # trace le nuage ground truth
         l = clouds[ind_c].points.detach().numpy()
-        ax.plot(l[:, 0], l[:, 1], l[:, 2], "r.")
+        ax.plot(l[:, 0], l[:, 1], l[:, 2], "r,")
         
         ani = animation.FuncAnimation(fig, update, epochs, fargs=(res["predicted"][ind_c], scattered), interval=500)
         plt.show()  # le dernier angle de vu est utilisé pour l'animation

@@ -1,5 +1,12 @@
-from scipy.spatial import KDTree
 import torch
+from scipy.spatial import cKDTree as KDTree
+# from scipy.spatial import KDTree
+import sys
+sys.setrecursionlimit(10000) # 1000 par défaut
+# la construction des kd-tree est récursive et plante si trop de points
+# 2^15 > 30000 donc une depth de 15 devrait suffire théoriquement
+# les cKDTree sont assez bien équilibrés la profondeur ne dépasse pas 500
+# les KDTree ne sont pas assez bien équilibrés (atteignent 2000)
 
 
 class Nuage:
@@ -21,6 +28,8 @@ class Nuage:
         self.points = points # la liste des points sous forme de tensor
         self.kdtree = KDTree(points.detach().numpy()) # kdtree.data est forcément un numpy.array
         self.eps = eps
+        
+        # print(get_depth_KDTree(self.kdtree.tree))
     
     def chamfer(self, other, sub_sampling=None, k=1):
         """sub_sampling de la liste des points de other
@@ -62,3 +71,15 @@ class Nuage:
         normes = normes.reshape((len(self.kdtree.data), len(other.kdtree.data)))
         # noinspection PyTypeChecker
         return torch.mean(torch.min(normes, dim=0)[0])*.5, torch.mean(torch.min(normes, dim=1)[0])*.5
+    
+    
+def get_depth_KDTree(node, depth=0):
+    if isinstance(node, KDTree.leafnode):
+        return depth
+    return max(get_depth_KDTree(node.less, depth+1), get_depth_KDTree(node.greater, depth+1))
+    
+    
+def get_depth_cKDTree(node, depth=0):
+    if node is None:
+        return depth
+    return max(get_depth_cKDTree(node.lesser, depth+1), get_depth_cKDTree(node.greater, depth+1))
