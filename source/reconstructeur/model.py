@@ -39,6 +39,14 @@ class Reconstructeur(nn.Module):
             #tanh ramène dans [-1, 1], comme les nuages de notre auto-encodeur et de groueix
             nn.Tanh()
         ) for _ in range(n_mlp)])
+
+        def init_weights(m):
+            if type(m) == nn.Linear:
+                torch.nn.init.xavier_normal_(m.weight)
+                # m.bias.data.fill_(0.01)
+                
+        for net in self.decodeurs:
+            net.apply(init_weights)
         
         self.grid = self._gen_grid()
         
@@ -76,7 +84,7 @@ class Reconstructeur(nn.Module):
     
 
 #todo refactor
-def fit_reconstructeur(reconstructeur, train, epochs, sample_size=None,
+def fit_reconstructeur(reconstructeur, train, epochs, sample_size=None, mini_batch_size=1,
                        lr=1e-4, lr_decay=.05, grid_scale=1, loss_factor=1.0,
                        ind_cloud_saved=range(0), test=None, list_epoch_loss=range(0)):
     """
@@ -134,30 +142,33 @@ def fit_reconstructeur(reconstructeur, train, epochs, sample_size=None,
             reconstructeur.train()
         
         # train
-        for i in range(len(train[0])):
-            x = train[0][i]
-            y = train[1][i]
-            assert not x.requires_grad
-            
-            y_pred = reconstructeur.forward(x)
-            
-            if i in ind_cloud_saved:
-                list_predicted[i].append(y_pred.detach().numpy().copy())
-            
-            time0 = time.time()
-            y_pred = Nuage(y_pred, eps=0)
-            
-            loss = reconstructeur.loss(y_pred, y, k=loss_factor[epoch], sub_sampling=sub_sampling[epoch])
-            time_loss += time.time() - time0
-            
-            print("loss", loss)
-            loss_train[0] += loss[0].item()
-            loss_train[1] += loss[1].item()
-            
+        for i in range(0, len(train[0]), mini_batch_size):
+            mini_batch_loss = None
+            for j in range(i, min(i+mini_batch_size, len(train[0]))):
+                x = train[0][j]
+                y = train[1][j]
+                assert not x.requires_grad
+                
+                y_pred = reconstructeur.forward(x)
+                
+                if j in ind_cloud_saved:
+                    list_predicted[j].append(y_pred.detach().numpy().copy())
+                
+                time0 = time.time()
+                y_pred = Nuage(y_pred, eps=0)
+                loss = reconstructeur.loss(y_pred, y, k=loss_factor[epoch], sub_sampling=sub_sampling[epoch])
+                time_loss += time.time() - time0
+                
+                print("loss", loss)
+                loss_train[0] += loss[0].item()
+                loss_train[1] += loss[1].item()
+                
+                loss = loss[0] + loss[1]
+                mini_batch_loss = loss if mini_batch_loss is None else mini_batch_loss + loss
+                
             # Zero gradients, perform a backward pass, and update the weights.
             optimizer.zero_grad()
-            loss = loss[0] + loss[1]
-            loss.backward()
+            mini_batch_loss.backward()
             optimizer.step()
 
         list_loss_train.append((loss_train[0] / len(train[1]), loss_train[1] / len(train[1])))
@@ -220,17 +231,3 @@ if __name__ == '__main__':
 # torch.save(the_model.state_dict(), PATH)
 # the_model = TheModelClass(*args, **kwargs)
 # the_model.load_state_dict(torch.load(PATH))
-
-
-"""todo list
-
-calculer/mesurer coût en fonction de
-  ground_truth_size
-  n_mlp
-  grid_point
-  (epochs, n_clouds)
-  loss chamfer ou simplifiée
-  loss distances au carrées ou non
-
-
-save 3D"""

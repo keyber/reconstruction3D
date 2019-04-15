@@ -52,6 +52,7 @@ def _gen_clouds(root, id_category, nPerCat, sous_echantillonage):
             # noinspection PyTypeChecker
             res.append(torch.cat(sub_sampled).reshape((-1, 3)))
     
+    assert not res[0].requires_grad
     return np.array(res, dtype=torch.Tensor)
 
 
@@ -132,6 +133,7 @@ def get_latent(chosenSubSet, nPerCat, nPerObj):
         #sauvegarde des vecteurs latents
         _save_latent(latentVectors, local_path, id_category, nPerCat, nPerObj)
     
+    assert not latentVectors[0].requires_grad
     return latentVectors
 
 

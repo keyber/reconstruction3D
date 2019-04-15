@@ -53,7 +53,7 @@ class Nuage:
         
         # les MLP ne doivent pas dépasser la zone à couvrir
         if k2 == 0:
-            loss1 = 0
+            loss1 = torch.tensor(0.0)
         else:
             list_ind = [other.kdtree.query(p, k=1, eps=other.eps)[1] for p in self.kdtree.data]
             corresponding =  other_list_full[list_ind]
