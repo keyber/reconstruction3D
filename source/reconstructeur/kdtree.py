@@ -1,4 +1,5 @@
 import torch
+import scipy.spatial
 from scipy.spatial import cKDTree as KDTree
 # from scipy.spatial import KDTree
 import sys
@@ -44,28 +45,32 @@ class Nuage:
         
         # les points doivent bien être atteint par un MLP
         # pour chaque point de other, récupère le point le plus proche dans self
-        list_ind = [self.kdtree.query(p, k=1, eps=self.eps)[1] for p in other_list_subsampled] #query retourne (d_min, argmin)
+        list_ind = [self.kdtree.query(p, eps=self.eps)[1] for p in other_list_subsampled] #query retourne (d_min, argmin)
         corresponding =  self_list[list_ind]
         diff = other_list_subsampled - corresponding
         # noinspection PyTypeChecker
-        loss0 = torch.mean(torch.sum(torch.pow(diff, 2), dim=1))
+        dist = torch.sum(torch.pow(diff, 2), dim=1)
+        loss0 = torch.mean(dist)
+        print("mean", loss0.item(), "min", torch.min(dist).item(), "max", torch.max(dist).item(), "std", torch.std(dist).item())
         loss0 *= k1
         
         # les MLP ne doivent pas dépasser la zone à couvrir
         if k2 == 0:
             loss1 = torch.tensor(0.0)
         else:
-            list_ind = [other.kdtree.query(p, k=1, eps=other.eps)[1] for p in self.kdtree.data]
-            corresponding =  other_list_full[list_ind]
+            list_ind = [other.kdtree.query(p, eps=other.eps)[1] for p in self.kdtree.data]
+            corresponding = other_list_full[list_ind]
             diff = self_list - corresponding
             # noinspection PyTypeChecker
-            loss1 = torch.mean(torch.sum(torch.pow(diff, 2), dim=1))
+            dist = torch.sum(torch.pow(diff, 2), dim=1)
+            loss1 = torch.mean(dist)
+            print("mean", loss1.item(), "min", torch.min(dist).item(), "max", torch.max(dist).item(), "std", torch.std(dist).item())
             loss1 *= k2
         
         return loss0, loss1
 
     def chamfer_quadratic(self, other, **kwargs):
-        del kwargs #enlève le warning (kwargs récupère d'autres params spécifiés sans lever d'errreur)
+        del kwargs #enlève le warning (kwargs récupère d'autres params spécifiés sans lever d'erreur)
         # noinspection PyTypeChecker
         normes = torch.cat([torch.cat([torch.sum(torch.pow(y - s, 2)).unsqueeze(0) for s in other.points]) for y in self.points])
         normes = normes.reshape((len(self.kdtree.data), len(other.kdtree.data)))
@@ -74,7 +79,7 @@ class Nuage:
     
     
 def get_depth_KDTree(node, depth=0):
-    if isinstance(node, KDTree.leafnode):
+    if isinstance(node, scipy.spatial.KDTree.leafnode):
         return depth
     return max(get_depth_KDTree(node.less, depth+1), get_depth_KDTree(node.greater, depth+1))
     

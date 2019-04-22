@@ -76,7 +76,7 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
 - 12/03
   - Visualisation de l'auto-encoder à expliquer
   - Visualiser plan vs sphere
-  - Chamfer O(n) ne suffit pas, il faut utiliseer Google Colab
+  - Chamfer O(n) ne suffit pas, il faut utiliser Google Colab
   - Chamfer doit utiliser des fonctions de pytorch et non de numpy
   - L'affichage des résultats se fera en Open3D pour pallier les probèmes rencontrés avec PyOPenGL.
   - Importer / coder une des techniques de reconstruction 3D existantes afin de l'utiliser comme une baseline pour l'évaluation de notre modèle.
@@ -95,6 +95,13 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
      - essayer des formes plus simples que des lampes
   - (afficher zones non couvertes dans l'optique de rajouter un MLP "à la volée"?)
   - (après entraînement, générer des nuages plus denses. Relier les points pour former des faces)
+
+- 16/04
+  - des reconstructions visuellement mauvaises sont parfois obtenues en train
+  - on pourrait créer des des nuages de points représentant des objets simples et une vue 2D, par exemple des sphères.
+  
+- 23/04
+  - mauvaises reconstructions déjà le cas avec 2 objets. Les reconstructions mauvaises ont la même distance de Chamfer que la "bonne" solution. Problème obtenu indépendement de la taille des nuages générés et ground truth, taille des mini-batch, implémentation de la loss.
 
 Projet effectué à l'UPMC dans le master DAC pour le M1S2 de l'année 2018/2019.
 Encadrants : Vincent Guigue & Nicolas Baskiotis.

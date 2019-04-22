@@ -10,44 +10,30 @@ import sys
 sys.path.append('./utils/')
 import input_output
 from sklearn.model_selection import train_test_split
-import random
+from time import time
 
-def choose_seed():
-    """permet de reproduire les résultats d'une exécution à l'autre"""
-    seed = np.random.randint(1<<31)
-    # seed = 569869671 #(4,3000,2) décalé
-    # seed = 693519698 #(4,3000,2) ortho
-    # seed = 254477178 #(4,300,1) décalé
-    seed = 881354212 #(2,300,1) ortho
-    
-    print("seed:", seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    random.seed(seed)
-    
 
 def _main_train_network():
-    choose_seed()
-    
     chosen_subset = [0]
-    n_per_cat = 2
+    n_per_cat = 10
     sample_size = 300
-    factor_sample_size = 1
+    factor_sample_size = 4
+    t = time()
     clouds = input_output.get_clouds(chosen_subset, n_per_cat, size=factor_sample_size * sample_size)
     latent = input_output.get_latent(chosen_subset, n_per_cat, nPerObj=1)  # /!\ attention: il faut que les fichiers sur le disque correspondent
-    clouds = [Nuage(x, eps=0) for x in clouds]
-    ratio_test = .02
+    clouds = [Nuage(x, eps=1e-3) for x in clouds]
+    ratio_test = .2
     train_x, test_x, train_y, test_y = train_test_split(latent, clouds, test_size=round(len(clouds)*ratio_test))
     print("nb train", len(train_y), "nb test", len(test_y))
     print("taille des nuages ground truth:", sample_size, "extraits de", len(clouds[0].points))
     
     latent_size = 25088  # défini par l'encodeur utilisé
     grid_size = 1e0
-    n_mlp = 8
+    n_mlp = 16
     grid_points = 6
-    epochs = 15
+    epochs = 45
     lr = 1e-4
-    mini_batch_size = 1
+    mini_batch_size = 5
     loss_factor_mode = 0
 
     if loss_factor_mode == 0:
@@ -117,14 +103,6 @@ def save(root, file, res, epochs, list_epoch_loss, clouds, ind_cloud_saved):
     plt.savefig(root + "_loss_tmp")
     plt.show()
     
-    # print(res['loss_detailled'])
-    # for i, loss in enumerate(res['loss_detailled']):
-    #     plt.plot(range(epochs), np.log10(loss)[:, 0], color='#BBBBFF')
-    #     plt.plot(range(epochs), np.log10(loss)[:, 1], color='#BBFFBB')
-    #     plt.plot(range(epochs), np.log10(np.sum(loss, axis=1)), color='#FFBBBB')
-    #     plt.title(str(i))
-    # plt.show()
-    
     for ind_c in ind_cloud_saved:
         plt.close("all")
         fig = plt.figure('figure')
@@ -141,9 +119,9 @@ def save(root, file, res, epochs, list_epoch_loss, clouds, ind_cloud_saved):
         l = clouds[ind_c].points.detach().numpy()
         ax.plot(l[:, 0], l[:, 1], l[:, 2], "r,")
         
-        ani = animation.FuncAnimation(fig, update, len(res["predicted"][ind_c]), fargs=(res["predicted"][ind_c], scattered), interval=500)
+        ani = animation.FuncAnimation(fig, update, epochs, fargs=(res["predicted"][ind_c], scattered), interval=500)
         plt.show()  # le dernier angle de vu est utilisé pour l'animation
-        
+    
         Writer = animation.writers['html']
         writer = Writer(fps=15, bitrate=1800)
         ani.save(root + file + "_n" + str(ind_c) + ".html", writer=writer)

@@ -113,6 +113,7 @@ def fit_reconstructeur(reconstructeur, train, epochs, sample_size=None, mini_bat
     list_predicted = {i:[] for i in ind_cloud_saved}
     list_loss_train = []
     list_loss_test = []
+    list_loss_detailled = [[] for _ in range(len(train[0]))]
     time_tot = time.time()
     time_loss = 0
     
@@ -163,6 +164,8 @@ def fit_reconstructeur(reconstructeur, train, epochs, sample_size=None, mini_bat
                 loss_train[0] += loss[0].item()
                 loss_train[1] += loss[1].item()
                 
+                list_loss_detailled[j].append((loss[0].item(), loss[1].item()))
+                
                 loss = loss[0] + loss[1]
                 mini_batch_loss = loss if mini_batch_loss is None else mini_batch_loss + loss
                 
@@ -184,6 +187,7 @@ def fit_reconstructeur(reconstructeur, train, epochs, sample_size=None, mini_bat
     print("temps loss", time_loss," tot", time_tot, "ratio", time_loss/time_tot)
     return {"loss_train": list_loss_train,
             "loss_test":  list_loss_test,
+            "loss_detailled":  list_loss_detailled,
             "predicted":  list_predicted,
             "time":       (time_tot, time_loss, time_loss/time_tot),
             }
@@ -221,7 +225,9 @@ def _test():
     res2 = fit_reconstructeur(reconstructeur2, ([latent], [c1]), epochs)
     
     # différences sûrement dues à des erreurs d'arrondi
-    assert np.all(np.abs(np.array(res1["loss_train"]) - np.array(res2["loss_train"])) < 1e-3)
+    m = np.max(np.abs(np.array(res1["loss_train"]) - np.array(res2["loss_train"])))
+    print("diff loss", m)
+    assert m < 1e-6
     print("tests passés")
 
 
