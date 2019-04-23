@@ -1,0 +1,7 @@
+data/
+outputs/
+outputs_animation/
+virtualEnv/
+source/reconstructeur/trained_network*
+*.idea
+*__pycache__
