@@ -51,7 +51,7 @@ class Nuage:
         # noinspection PyTypeChecker
         dist = torch.sum(torch.pow(diff, 2), dim=1)
         loss0 = torch.mean(dist)
-        print("  mean", loss0.item(), "min", torch.min(dist).item(), "max", torch.max(dist).item(), "std", torch.std(dist).item())
+        # print("  mean", loss0.item(), "min", torch.min(dist).item(), "max", torch.max(dist).item(), "std", torch.std(dist).item())
         loss0 *= k1
         
         # les MLP ne doivent pas dépasser la zone à couvrir
@@ -64,7 +64,7 @@ class Nuage:
             # noinspection PyTypeChecker
             dist = torch.sum(torch.pow(diff, 2), dim=1)
             loss1 = torch.mean(dist)
-            print("  mean", loss1.item(), "min", torch.min(dist).item(), "max", torch.max(dist).item(), "std", torch.std(dist).item())
+            # print("  mean", loss1.item(), "min", torch.min(dist).item(), "max", torch.max(dist).item(), "std", torch.std(dist).item())
             loss1 *= k2
         
         return loss0, loss1

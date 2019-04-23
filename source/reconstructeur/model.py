@@ -160,7 +160,7 @@ def fit_reconstructeur(reconstructeur, train, epochs, sample_size=None, mini_bat
                 loss = reconstructeur.loss(y_pred, y, k=loss_factor[epoch], sub_sampling=sub_sampling[epoch])
                 time_loss += time.time() - time0
                 
-                print("loss", loss)
+                print("loss", loss[0].item(), loss[1].item())
                 loss_train[0] += loss[0].item()
                 loss_train[1] += loss[1].item()
                 
@@ -179,7 +179,8 @@ def fit_reconstructeur(reconstructeur, train, epochs, sample_size=None, mini_bat
         if epoch in list_epoch_loss:
             print("time", epoch,
                   "loss train %.3e" % (list_loss_train[-1][0]+list_loss_train[-1][1]),
-                  "loss test %.3e" % (list_loss_test[-1][0]+list_loss_test[-1][1] if len(test[0]) else 0))
+                  "loss test %.3e" % (list_loss_test[-1][0]+list_loss_test[-1][1] if len(test[0]) else 0),
+                  "\n")
         
     #apprentissage fini, passage en mode évaluation
     reconstructeur.eval()
@@ -244,6 +245,8 @@ def _test2():
 
 
 if __name__ == '__main__':
+    import sys
+    sys.path.append('./utils/')
     import input_output
     _test()
     _test2()

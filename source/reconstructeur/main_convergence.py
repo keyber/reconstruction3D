@@ -14,33 +14,62 @@ import random
 
 def choose_seed():
     """permet de reproduire les résultats d'une exécution à l'autre"""
-    seed = np.random.randint(1<<31)
+    # seed = np.random.randint(1<<31)
     # seed = 569869671 #(4,3000,2) décalé
     # seed = 693519698 #(4,3000,2) ortho
     # seed = 254477178 #(4,300,1) décalé
+    
     seed = 881354212 #(2,300,1) ortho
     
     print("seed:", seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     random.seed(seed)
-    
+
+def affichage(n_mlp, latent_size, epochs, n_per_cat, grid_points, mini_batch_size):
+    n_weights = n_mlp * latent_size * 512 + 512 * 256 + 256 * 128 + 128 * 3  # nombre de coef dans un mlp
+    n_weights_forward = n_weights * epochs * n_per_cat * grid_points ** 2  # nombre de lecture de poids
+    n_weights_backward = n_weights * epochs * n_per_cat / mini_batch_size  # nombre d'écriture de poids
+    print("nombre de MLP:", n_mlp)
+    print("résolution de la grille:", grid_points, "^2 =", grid_points ** 2)
+    print("taille des nuages générés:", n_mlp, "*", grid_points ** 2, "=", n_mlp * grid_points ** 2)
+    print("nombre de poids {0: .1e}".format(n_weights))
+    # print("nombre de loss {0: .1e}".format(n_mlp *n_per_cat * epochs)) # temps loss négligeable
+    print("nombre de lecture/écriture poids {0:.1e}".format(n_weights_forward + n_weights_backward))
+    print("temps estimé {0:.0f}".format((n_weights_forward + n_weights_backward) * 5e-10))
+    # print("temps prétraitement", round(time() - t, 1)) # temps lecture et création kdtree négligeable
+
 
 def _main_train_network():
+    # fixe la graine aléatoire
     choose_seed()
     
+    # quelle(s) catégorie(s) d'objet utiliser (une seule pour le moment)
     chosen_subset = [0]
+    
+    # nombre d'objets par catégories
     n_per_cat = 2
+    
+    # taille des nuages de point de chaque objet (après sous-échantillonage)
     sample_size = 300
+    
+    # ratio de sous-échantillonage
     factor_sample_size = 1
+    
+    # charge les nuages du disque
     clouds = input_output.get_clouds(chosen_subset, n_per_cat, size=factor_sample_size * sample_size)
-    latent = input_output.get_latent(chosen_subset, n_per_cat, nPerObj=1)  # /!\ attention: il faut que les fichiers sur le disque correspondent
     clouds = [Nuage(x, eps=0) for x in clouds]
+    
+    # charge les vecteurs latents pré-calculés des images correspondantes
+    latent = input_output.get_latent(chosen_subset, n_per_cat, nPerObj=1)  # /!\ attention: il faut que les fichiers sur le disque correspondent
+    
     ratio_test = .02
     train_x, test_x, train_y, test_y = train_test_split(latent, clouds, test_size=round(len(clouds)*ratio_test))
+    
     print("nb train", len(train_y), "nb test", len(test_y))
     print("taille des nuages ground truth:", sample_size, "extraits de", len(clouds[0].points))
     
+    ##### PARAMETRES DU MODELE #####
     latent_size = 25088  # défini par l'encodeur utilisé
     grid_size = 1e0
     n_mlp = 8
@@ -57,22 +86,21 @@ def _main_train_network():
     else:
         loss_factor = [.001] * (epochs * 2 // 3) + [1.0] * (epochs // 3)
     
+    # création du modèle
     reconstructeur = Reconstructeur(n_mlp, latent_size, grid_points, Nuage.chamfer)
-    n_weights = n_mlp * latent_size*512 + 512*256 + 256*128 + 128*3 # nombre de coef dans un mlp
-    n_weights_forward  = n_weights * epochs * n_per_cat * grid_points ** 2 # nombre de lecture de poids
-    n_weights_backward = n_weights * epochs * n_per_cat / mini_batch_size  # nombre d'écriture de poids
-    print("nombre de MLP:", n_mlp)
-    print("résolution de la grille:", grid_points, "^2 =", grid_points ** 2)
-    print("taille des nuages générés:", n_mlp, "*", grid_points ** 2, "=", n_mlp * grid_points ** 2)
-    print("nombre de poids {0: .1e}".format(n_weights))
-    # print("nombre de loss {0: .1e}".format(n_mlp *n_per_cat * epochs)) # temps loss négligeable
-    print("nombre de lecture/écriture poids {0:.1e}".format(n_weights_forward + n_weights_backward))
-    print("temps estimé {0:.0f}".format((n_weights_forward + n_weights_backward) * 5e-10))
-    # print("temps prétraitement", round(time() - t, 1)) # temps lecture et création kdtree négligeable
     
-    list_epoch_loss = set(range(0, epochs, max(1, epochs//5))) | {epochs-1}
+    affichage(n_mlp, latent_size, epochs, n_per_cat, grid_points, mini_batch_size)
+    
+    ##### paramètres indiquant les tâches à effectuer pendant le fit #####
+    # sauvegarder les loss en train et test
+    list_epoch_loss = range(epochs)
+    
+    # sauvegarder les nuages construits
+    # les 3 premiers et les 3 derniers objets (ils font partie des tests si il y en a)
     ind_cloud_saved = set(range(3)) | set(range(n_per_cat-3, n_per_cat))
     ind_cloud_saved = {x for x in ind_cloud_saved if 0<=x<n_per_cat}
+    
+    # fit
     res = fit_reconstructeur(reconstructeur, (train_x, train_y), epochs, mini_batch_size=mini_batch_size,
                              sample_size=sample_size,
                              lr=lr, grid_scale=grid_size, loss_factor=loss_factor,
@@ -80,18 +108,19 @@ def _main_train_network():
                              list_epoch_loss=list_epoch_loss,
                              ind_cloud_saved=ind_cloud_saved)
     
+    # sauvegarde du modèle et affichage
     root = os.path.abspath(os.path.dirname(__file__)) + "/../../outputs_animation/"
     file = "mlp" + str(n_mlp) + "_grid" + str(grid_points) + "_lossmode" + str(loss_factor_mode) + "_idcat"\
            + (str(chosen_subset[0] if len(chosen_subset)==1 else chosen_subset))
-    trained_network = "trained_network_"+file+"_clouds"+str(len(train_x))+"_epoch"+str(epochs)
     
-    if input("save ?") == 'y':
-        if not os.path.exists(trained_network) or input("override ?")=='y':
-            torch.save(reconstructeur.state_dict(), trained_network)
-        elif input("skip ?")!='y':
-            # permet à l'utilisateur d'exécuter un code arbitraire
-            import pdb
-            pdb.set_trace()
+    # trained_network = "trained_network_"+file+"_clouds"+str(len(train_x))+"_epoch"+str(epochs)
+    # if input("save ?") == 'y':
+    #     if not os.path.exists(trained_network) or input("override ?")=='y':
+    #         torch.save(reconstructeur.state_dict(), trained_network)
+    #     elif input("skip ?")!='y':
+    #         # permet à l'utilisateur d'exécuter un code arbitraire
+    #         import pdb
+    #         pdb.set_trace()
     
     save(root, file, res, epochs, sorted(list_epoch_loss), clouds, sorted(ind_cloud_saved))
 
@@ -118,12 +147,13 @@ def save(root, file, res, epochs, list_epoch_loss, clouds, ind_cloud_saved):
     plt.show()
     
     # print(res['loss_detailled'])
-    # for i, loss in enumerate(res['loss_detailled']):
-    #     plt.plot(range(epochs), np.log10(loss)[:, 0], color='#BBBBFF')
-    #     plt.plot(range(epochs), np.log10(loss)[:, 1], color='#BBFFBB')
-    #     plt.plot(range(epochs), np.log10(np.sum(loss, axis=1)), color='#FFBBBB')
-    #     plt.title(str(i))
-    # plt.show()
+    for i, loss in enumerate(res['loss_detailled']):
+        plt.figure()
+        plt.plot(range(epochs), np.log10(loss)[:, 0], color='#BBBBFF')
+        plt.plot(range(epochs), np.log10(loss)[:, 1], color='#BBFFBB')
+        plt.plot(range(epochs), np.log10(np.sum(loss, axis=1)), color='#FFBBBB')
+        plt.title("loss détaillée du nuage " + str(i))
+    plt.show()
     
     for ind_c in ind_cloud_saved:
         plt.close("all")

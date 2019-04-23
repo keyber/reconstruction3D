@@ -138,10 +138,9 @@ def get_latent(chosenSubSet, nPerCat, nPerObj):
 
 
 def get_clouds(chosenSubSet, nPerCat, size):
-    """ratio int or float
-    ratio > nombre de points dans le fichier => ratio=1 (+ warning)"""
+    """ratio int or float"""
     assert type(size) is float and 0 < size <= 1 or type(size) is int
-    path = os.path.abspath(os.path.dirname(__file__)) + "/../../../AtlasNet/data/customShapeNet"
+    path = os.path.abspath(os.path.dirname(__file__)) + "/../../data/customShapeNet"
     id_category = _get_categories(path, chosenSubSet)
     return _gen_clouds(path, id_category, nPerCat, size)
 

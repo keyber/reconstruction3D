@@ -102,6 +102,7 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
   
 - 23/04
   - mauvaises reconstructions déjà le cas avec 2 objets. Les reconstructions mauvaises ont la même distance de Chamfer que la "bonne" solution. Problème obtenu indépendement de la taille des nuages générés et ground truth, taille des mini-batch, implémentation de la loss.
+  - mesurer loss boîte-boîte lampe-lampe et loss croisées
 
 Projet effectué à l'UPMC dans le master DAC pour le M1S2 de l'année 2018/2019.
 Encadrants : Vincent Guigue & Nicolas Baskiotis.
