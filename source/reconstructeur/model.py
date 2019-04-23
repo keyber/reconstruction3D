@@ -194,7 +194,6 @@ def fit_reconstructeur(reconstructeur, train, epochs, sample_size=None, mini_bat
 
 
 def _test():
-    import input_output
     c1 = Nuage(input_output.get_clouds([0], 1, size=.01)[0], eps=0)
     c2 = torch.tensor([[0., 0, 0], [1, 1, 1], [-1, -1, -1], [.2, .3, .0]])
     c2 = Nuage(c2, eps=0)
@@ -228,11 +227,27 @@ def _test():
     m = np.max(np.abs(np.array(res1["loss_train"]) - np.array(res2["loss_train"])))
     print("diff loss", m)
     assert m < 1e-6
-    print("tests passés")
+
+
+def _test2():
+    c1 = torch.tensor([[0., 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1]])
+    c1 = Nuage(c1, eps=0)
+    
+    assert 2*sum(c1.chamfer(c1)) == 0
+
+    for _ in range(10):
+        a = np.random.random() * 2 - 1
+        c2 = Nuage(torch.tensor([[a, 0, 0]]), eps=0)
+        l = c2.chamfer(c1)
+        assert abs(2 * 4 * l[0] - (1 + 1 + 2 + 4 * a * a)) < 1e-6
+        assert abs(2 * 1 * l[1] - a * a) < 1e-6
 
 
 if __name__ == '__main__':
+    import input_output
     _test()
+    _test2()
+    print("tests passés")
 
 # torch.save(the_model.state_dict(), PATH)
 # the_model = TheModelClass(*args, **kwargs)
