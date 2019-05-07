@@ -64,6 +64,7 @@ class Reconstructeur(nn.Module):
 
     # noinspection PyTypeChecker
     def forward(self, x0):
+        """reshape en (n_mlp, grid, grid, 3) pour obtenir les correspondances aux maillage initial"""
         # partie indépendante du sampling :
         y0_a = torch.cat([f(x0) for f in self.f0_a])
         y0_a = y0_a.reshape((self.n_mlp, 1, -1))
