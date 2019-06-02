@@ -17,7 +17,7 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
     - Chargement d'un modèle (vgg/ResNet) sur PyTorch (lecture de tutoriels PyTorch)
     - Exécuter l'algorithme forward du modèle (image -> vecteur latent) sur un sous-ensemble d'image et vérifier son bon fonctionnement en affichant le [t-SNE](https://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html) des vecteurs latents.
     - Afficher des nuages de points (matplotlib et/ou logiciel annexe)
-    - Afficher des nuages de points avec PyOpenGL / [Open3D](http://www.open3d.org/): L'affichage final se fera uniquement en Open3D. 
+    - Afficher des nuages de points avec PyOpenGL / [Open3D](http://www.open3d.org/). 
 3) Entraîner un réseau de neurones simple classifiant les objets à partir de leur représentation latente. Le réseau de neurones est composé d'une seule couche, cette couche est linéaire.
 4)
    1) Définir un auto encoder nuage de points 3D :
@@ -99,10 +99,12 @@ L'idée est de partir des [travaux de Thibault Groueix](http://imagine.enpc.fr/~
 - 16/04
   - des reconstructions visuellement mauvaises sont parfois obtenues en train
   - on pourrait créer des des nuages de points représentant des objets simples et une vue 2D, par exemple des sphères.
+  - Récupération d'une base-line.
   
 - 23/04
   - mauvaises reconstructions déjà le cas avec 2 objets. Les reconstructions mauvaises ont la même distance de Chamfer que la "bonne" solution. Problème obtenu indépendement de la taille des nuages générés et ground truth, taille des mini-batch, implémentation de la loss.
   - mesurer loss boîte-boîte lampe-lampe et loss croisées
+  - Recontruction des faces en servant de la grille à implémenter.
 
 Projet effectué à l'UPMC dans le master DAC pour le M1S2 de l'année 2018/2019.
 Encadrants : Vincent Guigue & Nicolas Baskiotis.
